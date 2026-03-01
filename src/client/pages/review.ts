@@ -58,7 +58,7 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
     const progress = total > 0 ? (stats.reviewed / total) * 100 : 0;
 
     container.innerHTML = `
-      <div class="max-w-lg mx-auto px-4 py-4 flex flex-col min-h-[calc(100vh-4rem)]">
+      <div class="max-w-lg mx-auto px-4 py-4 pb-24">
         <!-- Progress -->
         <div class="mb-4">
           <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
@@ -71,14 +71,14 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
         </div>
 
         <!-- Card -->
-        <div class="flex-1 flex items-center justify-center">
-          <div class="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 md:p-8">
-            <div class="card-content text-lg text-gray-900 dark:text-gray-100 leading-relaxed">${card.promptHtml}</div>
-          </div>
+        <div class="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 md:p-8">
+          <div class="card-content text-lg text-gray-900 dark:text-gray-100 leading-relaxed">${card.promptHtml}</div>
         </div>
+      </div>
 
-        <!-- Action -->
-        <div class="mt-4 pb-4">
+      <!-- Action (fixed) -->
+      <div class="fixed bottom-0 inset-x-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div class="max-w-lg mx-auto">
           <button
             id="btn-show"
             class="w-full h-14 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold text-base rounded-xl hover:opacity-90 transition-opacity"
@@ -98,7 +98,7 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
     const progress = total > 0 ? (stats.reviewed / total) * 100 : 0;
 
     container.innerHTML = `
-      <div class="max-w-lg mx-auto px-4 py-4 flex flex-col min-h-[calc(100vh-4rem)]">
+      <div class="max-w-lg mx-auto px-4 py-4 pb-24">
         <!-- Progress -->
         <div class="mb-4">
           <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
@@ -111,14 +111,14 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
         </div>
 
         <!-- Card (revealed) -->
-        <div class="flex-1 flex items-center justify-center">
-          <div class="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 md:p-8">
-            <div class="card-content text-lg text-gray-900 dark:text-gray-100 leading-relaxed">${card.revealHtml}</div>
-          </div>
+        <div class="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 md:p-8">
+          <div class="card-content text-lg text-gray-900 dark:text-gray-100 leading-relaxed">${card.revealHtml}</div>
         </div>
+      </div>
 
-        <!-- Rating buttons -->
-        <div class="mt-4 pb-4 grid grid-cols-2 gap-3">
+      <!-- Rating buttons (fixed) -->
+      <div class="fixed bottom-0 inset-x-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div class="max-w-lg mx-auto grid grid-cols-2 gap-3">
           <button
             id="btn-fail"
             class="h-14 bg-red-500 hover:bg-red-600 text-white font-semibold text-base rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -129,7 +129,7 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
             id="btn-pass"
             class="h-14 bg-green-600 hover:bg-green-700 text-white font-semibold text-base rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            <span>✓ Pass</span><span class="text-xs opacity-60">[→ l k]</span>
+            <span>✓ Pass</span><span class="text-xs opacity-60">[→ l k Space]</span>
           </button>
         </div>
       </div>`;
@@ -170,7 +170,8 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
       if (!card) return;
       if (e.key === 'ArrowLeft' || e.key === 'h' || e.key === 'j') {
         submitRating(card, false);
-      } else if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'k') {
+      } else if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'k' || e.key === ' ') {
+        e.preventDefault();
         submitRating(card, true);
       }
     }
