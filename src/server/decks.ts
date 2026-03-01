@@ -9,6 +9,11 @@ const registry = new Map<string, ParsedDeck>();
 
 let lastSyncAt = 0;
 
+export function clearDecks(): void {
+  registry.clear();
+  lastSyncAt = 0;
+}
+
 export function getDeck(id: string): ParsedDeck | undefined {
   return registry.get(id);
 }
