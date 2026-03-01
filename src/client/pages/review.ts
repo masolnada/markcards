@@ -54,8 +54,7 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
   function renderFront(card: RenderedCard) {
     state = 'front';
     const remaining = cards.length - current;
-    const total = cards.length + stats.reviewed;
-    const progress = total > 0 ? (stats.reviewed / total) * 100 : 0;
+    const progress = calcProgress(stats.reviewed, cards.length);
 
     container.innerHTML = `
       <div class="max-w-lg mx-auto px-4 py-4 pb-24">
@@ -94,8 +93,7 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
   function renderBack(card: RenderedCard) {
     state = 'back';
     const remaining = cards.length - current;
-    const total = cards.length + stats.reviewed;
-    const progress = total > 0 ? (stats.reviewed / total) * 100 : 0;
+    const progress = calcProgress(stats.reviewed, cards.length);
 
     container.innerHTML = `
       <div class="max-w-lg mx-auto px-4 py-4 pb-24">
@@ -203,4 +201,8 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
 
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+export function calcProgress(reviewed: number, total: number): number {
+  return total > 0 ? (reviewed / total) * 100 : 0;
 }
