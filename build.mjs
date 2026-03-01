@@ -1,6 +1,8 @@
 import * as esbuild from 'esbuild';
 import { execSync, spawn } from 'child_process';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
+
+const { version } = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 const watch = process.argv.includes('--watch');
 
@@ -25,6 +27,7 @@ const clientOptions = {
   minify: !watch,
   target: ['es2020'],
   sourcemap: watch,
+  define: { __APP_VERSION__: JSON.stringify(version) },
 };
 
 if (watch) {
