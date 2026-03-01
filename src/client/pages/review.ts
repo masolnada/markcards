@@ -166,12 +166,12 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
       const card = cards[current];
       if (card) renderBack(card);
     } else if (state === 'back') {
-      if (e.key === 'ArrowLeft') {
-        const card = cards[current];
-        if (card) submitRating(card, false);
-      } else if (e.key === 'ArrowRight') {
-        const card = cards[current];
-        if (card) submitRating(card, true);
+      const card = cards[current];
+      if (!card) return;
+      if (e.key === 'ArrowLeft' || e.key === 'h' || e.key === 'j') {
+        submitRating(card, false);
+      } else if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'k') {
+        submitRating(card, true);
       }
     }
   }
@@ -185,7 +185,7 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
   // Load queue
   setLoading();
   try {
-    const queue = await api.getReviewQueue();
+    const queue = await api.getReviewQueue(deckId);
     cards = queue.cards;
   } catch (err) {
     container.innerHTML = `<div class="p-4 text-red-500">Failed to load review queue: ${err}</div>`;

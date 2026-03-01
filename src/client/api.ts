@@ -52,8 +52,8 @@ export const api = {
     return apiFetch(`/api/decks/${deckId}`);
   },
 
-  getReviewQueue(): Promise<ReviewQueue> {
-    return apiFetch('/api/review');
+  getReviewQueue(deckId?: string): Promise<ReviewQueue> {
+    return apiFetch(deckId ? `/api/review/${deckId}` : '/api/review');
   },
 
   submitReview(cardId: string, pass: boolean): Promise<ReviewResult> {
