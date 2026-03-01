@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { getAllDecks, getDeck, syncIfStale } from '../decks.js';
-import { getAllDueCardIds, getCard, updateCard, getDeckStats } from '../db.js';
+import { getDueReviewCardIds, getNewCardIdsForQueue, countNewCardsReviewedToday, getCard, updateCard, getDeckStats } from '../db.js';
 import { schedule } from '../fsrs.js';
 import type { Rating } from '../fsrs.js';
+import { getSettings } from '../settings.js';
 import { renderMarkdown, renderClozePrompt, renderClozeReveal } from '../render.js';
 
 const router = Router();
@@ -54,7 +55,11 @@ function renderCard(cardId: string, deckId: string): RenderedCard | null {
 router.get('/api/review', async (_req, res) => {
   await syncIfStale();
   const now = new Date();
-  const due = getAllDueCardIds(now);
+  const settings = getSettings();
+  const reviewCards = getDueReviewCardIds(now);
+  const newLimit = Math.max(0, settings.maxNewPerDay - countNewCardsReviewedToday(now));
+  const newCards = getNewCardIdsForQueue(now, newLimit);
+  const due = [...reviewCards, ...newCards];
 
   const cards: RenderedCard[] = [];
   for (const { cardId, deckId } of due) {
@@ -76,7 +81,11 @@ router.get('/api/review/:deckId', async (req, res) => {
   }
 
   const now = new Date();
-  const due = getAllDueCardIds(now).filter(d => d.deckId === deckId);
+  const settings = getSettings();
+  const reviewCards = getDueReviewCardIds(now).filter(d => d.deckId === deckId);
+  const newLimit = Math.max(0, settings.maxNewPerDay - countNewCardsReviewedToday(now));
+  const newCards = getNewCardIdsForQueue(now, newLimit).filter(d => d.deckId === deckId);
+  const due = [...reviewCards, ...newCards];
 
   const cards: RenderedCard[] = [];
   for (const { cardId } of due) {
@@ -104,7 +113,8 @@ router.post('/api/review', (req, res) => {
 
   const rating: Rating = pass ? 3 : 1; // Good or Again
   const now = new Date();
-  const result = schedule(card, rating, now);
+  const { learningSteps, relearningSteps } = getSettings();
+  const result = schedule(card, rating, now, { learningSteps, relearningSteps });
   updateCard(cardId, result.card, rating);
 
   res.json({

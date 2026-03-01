@@ -155,3 +155,29 @@ export function getAllDueCardIds(now: Date): { cardId: string; deckId: string }[
   ).all(now.toISOString()) as { card_id: string; deck_id: string }[];
   return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
 }
+
+// Get due non-new cards (state > 0) across all decks
+export function getDueReviewCardIds(now: Date): { cardId: string; deckId: string }[] {
+  const rows = db.prepare(
+    `SELECT card_id, deck_id FROM cards WHERE state > 0 AND due <= ? ORDER BY due ASC`
+  ).all(now.toISOString()) as { card_id: string; deck_id: string }[];
+  return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
+}
+
+// Get new cards (state = 0) due now, up to limit
+export function getNewCardIdsForQueue(now: Date, limit: number): { cardId: string; deckId: string }[] {
+  if (limit <= 0) return [];
+  const rows = db.prepare(
+    `SELECT card_id, deck_id FROM cards WHERE state = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
+  ).all(now.toISOString(), limit) as { card_id: string; deck_id: string }[];
+  return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
+}
+
+// Count new cards whose first review happened today (local time)
+export function countNewCardsReviewedToday(now: Date): number {
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const result = db.prepare(
+    `SELECT COUNT(*) as c FROM cards WHERE reps = 1 AND last_review >= ?`
+  ).get(todayStart.toISOString()) as { c: number };
+  return result.c;
+}

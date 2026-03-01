@@ -110,7 +110,15 @@ function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
-export function schedule(card: FSRSCard, rating: Rating, now: Date = new Date()): ScheduleResult {
+export interface ScheduleParams {
+  learningSteps?: number[];
+  relearningSteps?: number[];
+}
+
+export function schedule(card: FSRSCard, rating: Rating, now: Date = new Date(), params: ScheduleParams = {}): ScheduleResult {
+  const learningSteps = params.learningSteps ?? LEARNING_STEPS;
+  const relearningSteps = params.relearningSteps ?? RELEARNING_STEPS;
+
   const elapsed = card.lastReview
     ? Math.max(0, Math.round((now.getTime() - card.lastReview.getTime()) / 86400000))
     : 0;
@@ -126,13 +134,13 @@ export function schedule(card: FSRSCard, rating: Rating, now: Date = new Date())
     if (rating === 1) {
       // Again: stay in Learning, step 0
       next.state = 1;
-      const interval = LEARNING_STEPS[0];
+      const interval = learningSteps[0];
       next.due = addMinutes(now, interval);
       next.scheduledDays = 0;
     } else if (rating === 2 || rating === 3) {
       // Hard/Good: move to next step or graduate
       next.state = 1;
-      const interval = LEARNING_STEPS[LEARNING_STEPS.length - 1];
+      const interval = learningSteps[learningSteps.length - 1];
       next.due = addMinutes(now, interval);
       next.scheduledDays = 0;
     } else {
@@ -152,7 +160,7 @@ export function schedule(card: FSRSCard, rating: Rating, now: Date = new Date())
       // Again: reset to first step
       next.stability = initStability(rating);
       next.difficulty = initDifficulty(rating);
-      next.due = addMinutes(now, LEARNING_STEPS[0]);
+      next.due = addMinutes(now, learningSteps[0]);
       next.scheduledDays = 0;
     } else if (rating === 2 || rating === 3) {
       // Hard/Good: graduate to Review
@@ -178,7 +186,7 @@ export function schedule(card: FSRSCard, rating: Rating, now: Date = new Date())
       next.stability = nextForgetStability(card.difficulty, card.stability, r);
       next.difficulty = nextDifficulty(card.difficulty, rating);
       next.state = 3; // Relearning
-      next.due = addMinutes(now, RELEARNING_STEPS[0]);
+      next.due = addMinutes(now, relearningSteps[0]);
       next.scheduledDays = 0;
     } else {
       // Hard/Good/Easy: successful recall
@@ -198,7 +206,7 @@ export function schedule(card: FSRSCard, rating: Rating, now: Date = new Date())
     if (rating === 1) {
       // Again: stay in relearning
       next.stability = nextForgetStability(card.difficulty, card.stability, 0);
-      next.due = addMinutes(now, RELEARNING_STEPS[0]);
+      next.due = addMinutes(now, relearningSteps[0]);
       next.scheduledDays = 0;
     } else {
       // Hard/Good/Easy: graduate back to Review

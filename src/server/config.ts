@@ -11,6 +11,7 @@ function envOpt(key: string): string | undefined {
 export const config = {
   decksDir: resolve(env('DECKS_DIR', './decks')),
   dbPath: resolve(env('DB_PATH', './markcards.db')),
+  settingsPath: resolve(env('SETTINGS_PATH', './settings.json')),
   port: parseInt(env('PORT', '3000'), 10),
 
   // GitHub deck source (optional)
