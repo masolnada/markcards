@@ -123,13 +123,13 @@ export async function renderReviewPage(container: HTMLElement, deckId?: string):
             id="btn-fail"
             class="h-14 bg-red-500 hover:bg-red-600 text-white font-semibold text-base rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            <span>✗ Fail</span><span class="text-xs opacity-60">[←]</span>
+            <span>✗ Fail</span><span class="text-xs opacity-60">[← h j]</span>
           </button>
           <button
             id="btn-pass"
             class="h-14 bg-green-600 hover:bg-green-700 text-white font-semibold text-base rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            <span>✓ Pass</span><span class="text-xs opacity-60">[→]</span>
+            <span>✓ Pass</span><span class="text-xs opacity-60">[→ l k]</span>
           </button>
         </div>
       </div>`;
