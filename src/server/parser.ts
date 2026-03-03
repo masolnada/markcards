@@ -63,18 +63,30 @@ export function parseDeck(filePath: string, content: string): ParsedDeck {
   // Normalize line endings
   const lines = body.replace(/\r\n/g, '\n').split('\n');
 
-  // Build "blocks" separated by blank lines or --- lines
+  // Build "blocks" separated by blank lines or --- lines.
+  // Blank lines inside a Q: block (before A: is seen) are kept as content
+  // so that images or extra paragraphs between Q: and A: stay in the card.
   const blocks: string[][] = [];
   let current: string[] = [];
+  let inQBlock = false; // true after Q:, false after A: or ---
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed === '' || trimmed === '---') {
-      if (current.length > 0) {
-        blocks.push(current);
+    if (trimmed === '---') {
+      if (current.length > 0) blocks.push(current);
+      current = [];
+      inQBlock = false;
+    } else if (trimmed === '') {
+      if (inQBlock) {
+        // blank line within an open Q block — keep as content
+        current.push(line);
+      } else {
+        if (current.length > 0) blocks.push(current);
         current = [];
       }
     } else {
+      if (/^Q:/i.test(trimmed)) inQBlock = true;
+      if (/^A:/i.test(trimmed)) inQBlock = false;
       current.push(line);
     }
   }

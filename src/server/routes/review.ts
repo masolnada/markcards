@@ -27,8 +27,18 @@ function renderCard(cardId: string, deckId: string): RenderedCard | null {
   const parsedCard = deck.cards.find(c => c.id === cardId);
   if (!parsedCard) return null;
 
-  const rel = relative(config.decksDir, dirname(deck.filePath));
-  const imageBaseUrl = rel ? `/decks/${rel}` : '/decks';
+  let imageBaseUrl: string;
+  if (deck.filePath.startsWith('github:')) {
+    // virtualPath format: github:owner/repo/path/to/file.md
+    const withoutPrefix = deck.filePath.slice('github:'.length);
+    const [owner, repo, ...parts] = withoutPrefix.split('/');
+    const deckDir = parts.slice(0, -1).join('/');
+    const base = `https://raw.githubusercontent.com/${owner}/${repo}/${config.githubBranch}`;
+    imageBaseUrl = deckDir ? `${base}/${deckDir}` : base;
+  } else {
+    const rel = relative(config.decksDir, dirname(deck.filePath));
+    imageBaseUrl = rel ? `/decks/${rel}` : '/decks';
+  }
 
   if (parsedCard.type === 'qa') {
     const questionHtml = renderMarkdown(parsedCard.question ?? '', imageBaseUrl);
