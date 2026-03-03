@@ -137,11 +137,16 @@ export interface DeckStats {
   newCards: number;
 }
 
-export function getDeckStats(deckId: string, now: Date): DeckStats {
+export function getDeckStats(deckId: string, now: Date, newLimit = Infinity): DeckStats {
   const total = (db.prepare('SELECT COUNT(*) as c FROM cards WHERE deck_id = ?').get(deckId) as { c: number }).c;
-  const due = (db.prepare(
-    `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND due <= ?`
+  const dueReview = (db.prepare(
+    `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state > 0 AND due <= ?`
   ).get(deckId, now.toISOString()) as { c: number }).c;
+  const newDueRaw = (db.prepare(
+    `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0 AND due <= ?`
+  ).get(deckId, now.toISOString()) as { c: number }).c;
+  const dueNew = isFinite(newLimit) ? Math.min(newDueRaw, Math.max(0, newLimit)) : newDueRaw;
+  const due = dueReview + dueNew;
   const newCards = (db.prepare(
     `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0`
   ).get(deckId) as { c: number }).c;
