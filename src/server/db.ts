@@ -178,11 +178,29 @@ export function getNewCardIdsForQueue(now: Date, limit: number): { cardId: strin
   return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
 }
 
-// Count new cards whose first review happened today (local time)
+// Count new cards whose first review happened today (local time).
+// Uses review_log to find the first-ever review of each card, so the count
+// remains correct even after the card is reviewed multiple times in one session
+// (which would raise reps above 1, breaking a naive `reps = 1` check).
 export function countNewCardsReviewedToday(now: Date): number {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const result = db.prepare(
-    `SELECT COUNT(*) as c FROM cards WHERE reps = 1 AND last_review >= ?`
-  ).get(todayStart.toISOString()) as { c: number };
+  const result = db.prepare(`
+    SELECT COUNT(*) as c FROM (
+      SELECT MIN(id) as first_id FROM review_log GROUP BY card_id
+    ) first_reviews
+    JOIN review_log rl ON rl.id = first_reviews.first_id
+    WHERE rl.review_time >= ?
+  `).get(todayStart.toISOString()) as { c: number };
   return result.c;
+}
+
+// Get new cards (state = 0) due now for a specific deck, up to limit.
+// Use this for per-deck review queues so that new cards from other decks
+// filling up the global slot cannot shadow this deck's new cards.
+export function getNewCardIdsForDeckQueue(deckId: string, now: Date, limit: number): { cardId: string; deckId: string }[] {
+  if (limit <= 0) return [];
+  const rows = db.prepare(
+    `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
+  ).all(deckId, now.toISOString(), limit) as { card_id: string }[];
+  return rows.map(r => ({ cardId: r.card_id, deckId }));
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getAllDecks, getDeck, syncIfStale } from '../decks.js';
-import { getDueReviewCardIds, getNewCardIdsForQueue, countNewCardsReviewedToday, getCard, updateCard, getDeckStats } from '../db.js';
+import { getDueReviewCardIds, getNewCardIdsForQueue, getNewCardIdsForDeckQueue, countNewCardsReviewedToday, getCard, updateCard, getDeckStats } from '../db.js';
 import { schedule } from '../fsrs.js';
 import type { Rating } from '../fsrs.js';
 import { getSettings } from '../settings.js';
@@ -84,7 +84,7 @@ router.get('/api/review/:deckId', async (req, res) => {
   const settings = getSettings();
   const reviewCards = getDueReviewCardIds(now).filter(d => d.deckId === deckId);
   const newLimit = Math.max(0, settings.maxNewPerDay - countNewCardsReviewedToday(now));
-  const newCards = getNewCardIdsForQueue(now, newLimit).filter(d => d.deckId === deckId);
+  const newCards = getNewCardIdsForDeckQueue(deckId, now, newLimit);
   const due = [...reviewCards, ...newCards];
 
   const cards: RenderedCard[] = [];
