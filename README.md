@@ -40,7 +40,9 @@ The `/data` volume stores the SQLite database (review history, scheduling state)
 ```bash
 git clone https://github.com/your-username/markcards
 cd markcards
-docker build -t markcards .
+docker build \
+  --build-arg APP_VERSION=$(git log -1 --format=%cd-%h --date=format:%Y%m%d) \
+  -t markcards .
 ```
 
 ---
@@ -176,6 +178,14 @@ A: If $F' = f$, then:
 ## How card IDs work
 
 Card IDs are derived from the card content (question + answer text for Q&A, template + position for cloze). Renaming a deck file or moving it does **not** reset review history as long as the card text stays the same. Editing a card's text creates a new card.
+
+---
+
+## Versioning
+
+Markcards uses a `YYYYMMDD-<shorthash>` version string (e.g. `20260303-d4d9c0f`) rather than semver. The version is injected at Docker image build time via the `APP_VERSION` build argument and baked into the client bundle as a compile-time constant by esbuild.
+
+This keeps the version tied directly to a specific commit without requiring a separate version-bump commit. When building locally without the build arg, the version defaults to `dev`.
 
 ---
 

@@ -1,8 +1,8 @@
 import * as esbuild from 'esbuild';
 import { execSync, spawn } from 'child_process';
-import { existsSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 
-const { version } = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const version = process.env.APP_VERSION ?? 'dev';
 
 const watch = process.argv.includes('--watch');
 
