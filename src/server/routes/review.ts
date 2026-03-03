@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import { dirname, relative } from 'path';
 import { getAllDecks, getDeck, syncIfStale } from '../decks.js';
+import { config } from '../config.js';
 import { getDueReviewCardIds, getNewCardIdsForQueue, getNewCardIdsForDeckQueue, countNewCardsReviewedToday, getCard, updateCard, getDeckStats } from '../db.js';
 import { schedule } from '../fsrs.js';
 import type { Rating } from '../fsrs.js';
@@ -25,9 +27,12 @@ function renderCard(cardId: string, deckId: string): RenderedCard | null {
   const parsedCard = deck.cards.find(c => c.id === cardId);
   if (!parsedCard) return null;
 
+  const rel = relative(config.decksDir, dirname(deck.filePath));
+  const imageBaseUrl = rel ? `/decks/${rel}` : '/decks';
+
   if (parsedCard.type === 'qa') {
-    const questionHtml = renderMarkdown(parsedCard.question ?? '');
-    const answerHtml = renderMarkdown(parsedCard.answer ?? '');
+    const questionHtml = renderMarkdown(parsedCard.question ?? '', imageBaseUrl);
+    const answerHtml = renderMarkdown(parsedCard.answer ?? '', imageBaseUrl);
     return {
       cardId,
       deckId,
@@ -45,8 +50,8 @@ function renderCard(cardId: string, deckId: string): RenderedCard | null {
       deckId,
       deckName: deck.name,
       type: 'cloze',
-      promptHtml: renderClozePrompt(template, idx),
-      revealHtml: renderClozeReveal(template, idx),
+      promptHtml: renderClozePrompt(template, idx, imageBaseUrl),
+      revealHtml: renderClozeReveal(template, idx, imageBaseUrl),
     };
   }
 }

@@ -24,14 +24,21 @@ function renderMath(text: string): string {
   return text;
 }
 
-export function renderMarkdown(raw: string): string {
+export function renderMarkdown(raw: string, imageBaseUrl: string): string {
   const withMath = renderMath(raw);
-  // marked.parse returns a string when not using async mode
-  return marked.parse(withMath, { async: false }) as string;
+  const renderer = new marked.Renderer();
+  renderer.image = (href: string, title: string | null, text: string) => {
+    const src = href && !href.startsWith('http') && !href.startsWith('/')
+      ? `${imageBaseUrl}/${href}`
+      : href;
+    const titleAttr = title ? ` title="${title}"` : '';
+    return `<img src="${src}" alt="${text}"${titleAttr}>`;
+  };
+  return marked.parse(withMath, { async: false, renderer }) as string;
 }
 
 // Cloze: render with bracket[idx] as blank, others shown
-export function renderClozePrompt(template: string, idx: number): string {
+export function renderClozePrompt(template: string, idx: number, imageBaseUrl: string): string {
   let i = 0;
   const result = template.replace(/\[([^\]]+)\]/g, (_, word: string) => {
     const isTarget = i === idx;
@@ -40,11 +47,11 @@ export function renderClozePrompt(template: string, idx: number): string {
       ? `<span class="cloze-blank">_____</span>`
       : `<span class="cloze-shown">${escapeHtml(word)}</span>`;
   });
-  return renderMarkdown(result);
+  return renderMarkdown(result, imageBaseUrl);
 }
 
 // Cloze: render with bracket[idx] revealed, others shown
-export function renderClozeReveal(template: string, idx: number): string {
+export function renderClozeReveal(template: string, idx: number, imageBaseUrl: string): string {
   let i = 0;
   const result = template.replace(/\[([^\]]+)\]/g, (_, word: string) => {
     const isTarget = i === idx;
@@ -53,7 +60,7 @@ export function renderClozeReveal(template: string, idx: number): string {
       ? `<span class="cloze-answer">${escapeHtml(word)}</span>`
       : `<span class="cloze-shown">${escapeHtml(word)}</span>`;
   });
-  return renderMarkdown(result);
+  return renderMarkdown(result, imageBaseUrl);
 }
 
 function escapeHtml(s: string): string {

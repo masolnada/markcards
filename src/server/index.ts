@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { initDb } from './db.js';
-import { loadDecks, syncIfStale, getDeck } from './decks.js';
+import { loadDecks, syncIfStale } from './decks.js';
 import decksRouter from './routes/decks.js';
 import reviewRouter from './routes/review.js';
 
@@ -25,17 +25,8 @@ export function createApp() {
   app.use(decksRouter);
   app.use(reviewRouter);
 
-  // Serve deck assets (images, etc.) relative to deck file directory
-  app.get('/deck-assets/:deckId/*', (req, res) => {
-    const deck = getDeck(req.params.deckId);
-    if (!deck) {
-      res.status(404).json({ error: 'Deck not found' });
-      return;
-    }
-    const deckDir = dirname(deck.filePath);
-    const assetPath = (req.params as Record<string, string>)['0'];
-    res.sendFile(join(deckDir, assetPath));
-  });
+  // Serve files from the decks directory (images, etc.)
+  app.use('/decks', express.static(config.decksDir));
 
   // Static files (client.js, client.css)
   app.use(express.static(staticDir));
