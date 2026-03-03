@@ -2,7 +2,8 @@ import * as esbuild from 'esbuild';
 import { execSync, spawn } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
 
-const version = process.env.APP_VERSION ?? 'dev';
+const version = process.env.APP_VERSION
+  ?? execSync('git log -1 --format=%cd-%h --date=format:%Y%m%d').toString().trim();
 
 const watch = process.argv.includes('--watch');
 
