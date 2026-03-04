@@ -1,14 +1,46 @@
 services:
+  tailscale:
+    image: tailscale/tailscale:latest@sha256:21df0b5a84efa35c0a507f4dd2340e1b1295683634a28968707354d5bd991d9c
+    container_name: markcards-tailscale
+    restart: unless-stopped
+    hostname: markcards
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+    networks:
+      - markcards_net
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
   caddy:
-    image: caddy:alpine
-    ports:
-      - "${PORT:-80}:80"
+    build: ./caddy
+    container_name: markcards-caddy
+    restart: unless-stopped
+    network_mode: service:tailscale
+    depends_on:
+      tailscale:
+        condition: service_healthy
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - CADDY_ADMIN=:2019
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-    restart: unless-stopped
-    depends_on:
-      - server
-      - client
+      - caddy_data:/data
+      - caddy_config:/config
 
   server:
     build:
@@ -17,9 +49,11 @@ services:
       args:
         APP_VERSION: ${APP_VERSION:-dev}
     volumes:
-      - markcards-data:/data
+      - markcards_data:/data
       - ${DECKS_DIR:-./decks}:/decks:ro
     restart: unless-stopped
+    networks:
+      - markcards_net
 
   client:
     build:
@@ -28,16 +62,14 @@ services:
       args:
         APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
-
-  telegram-bot:
-    build:
-      context: apps/telegram-bot
-      dockerfile: Dockerfile
-    environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ALLOWED_USER_IDS: ${ALLOWED_USER_IDS:-}
-    restart: unless-stopped
+    networks:
+      - markcards_net
 
 volumes:
-  markcards-data:
+  markcards_data:
+  tailscale_state:
+  caddy_data:
+  caddy_config:
+
+networks:
+  markcards_net:

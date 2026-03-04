@@ -1,4 +1,14 @@
-:80 {
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+		resolvers nina.ns.cloudflare.com randy.ns.cloudflare.com
+		propagation_delay 60s
+	}
+
 	handle /api/* {
 		reverse_proxy server:3000
 	}
