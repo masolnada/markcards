@@ -17,6 +17,7 @@ services:
       - 1.1.1.1
       - 1.0.0.1
     networks:
+      - proxy_net
       - internal_net
     healthcheck:
       test: ["CMD", "tailscale", "status"]
@@ -72,4 +73,5 @@ volumes:
   caddy_config:
 
 networks:
+  proxy_net:
   internal_net:
