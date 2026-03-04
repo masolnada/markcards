@@ -1,5 +1,4 @@
 import express from 'express';
-import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Database } from 'bun:sqlite';
 import { config } from '../infrastructure/config.js';
@@ -15,14 +14,6 @@ import { createDecksRouter } from './routes/decks.js';
 import { createReviewRouter } from './routes/review.js';
 import type { Express } from 'express';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// __dirname = .../apps/server/dist → 3 levels up = workspace root
-const workspaceRoot = join(__dirname, '..', '..', '..');
-const staticDir = join(workspaceRoot, 'apps', 'client', 'dist');
-const htmlDir = join(workspaceRoot, 'apps', 'client', 'public');
-
 export function createApp(
   deckService: DeckService,
   reviewService: ReviewService,
@@ -35,12 +26,6 @@ export function createApp(
   app.use(createReviewRouter(reviewService));
 
   app.use('/decks', express.static(decksDir));
-  app.use(express.static(staticDir));
-  app.use(express.static(htmlDir));
-
-  app.get('*', (_req, res) => {
-    res.sendFile(join(htmlDir, 'index.html'));
-  });
 
   return app;
 }

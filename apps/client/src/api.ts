@@ -34,8 +34,10 @@ export interface ReviewResult {
   state: number;
 }
 
+const apiBase: string = (window as any).__MARKCARDS_API_BASE__ ?? '';
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init);
+  const res = await fetch(`${apiBase}${path}`, init);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((body as { error: string }).error ?? res.statusText);
