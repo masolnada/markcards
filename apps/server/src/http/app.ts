@@ -18,10 +18,10 @@ import type { Express } from 'express';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const isDist = __filename.endsWith('dist/server.mjs') || __dirname.endsWith('/dist');
-const projectRoot = isDist ? join(__dirname, '..') : join(__dirname, '..', '..', '..');
-const staticDir = join(projectRoot, 'dist');
-const htmlDir = join(projectRoot, 'public');
+// __dirname = .../apps/server/dist → 3 levels up = workspace root
+const workspaceRoot = join(__dirname, '..', '..', '..');
+const staticDir = join(workspaceRoot, 'apps', 'client', 'dist');
+const htmlDir = join(workspaceRoot, 'apps', 'client', 'public');
 
 export function createApp(
   deckService: DeckService,
