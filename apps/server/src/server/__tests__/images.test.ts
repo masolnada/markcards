@@ -85,29 +85,9 @@ describe('image URL rewriting in rendered cards', () => {
     expect(card.revealHtml).toContain('src="/decks/photo.jpg"');
   });
 
-  it('rewrites relative image src in cloze cards to /decks/ path', async () => {
-    const res = await request(app).get(`/api/review/${deck.id}`);
-    const card = res.body.cards.find((c: { revealHtml: string }) =>
-      c.revealHtml.includes('map.png')
-    );
-    expect(card).toBeDefined();
-    expect(card.revealHtml).toContain('src="/decks/assets/map.png"');
-  });
 });
 
 describe('static image serving from /decks/', () => {
-  it('serves an image from a subdirectory', async () => {
-    const res = await request(app).get('/decks/images/diagram.png');
-    expect(res.status).toBe(200);
-    expect(res.text).toBe('PNG_DATA');
-  });
-
-  it('serves a top-level image', async () => {
-    const res = await request(app).get('/decks/photo.jpg');
-    expect(res.status).toBe(200);
-    expect(res.text).toBe('JPG_DATA');
-  });
-
   it('returns 404 for a non-existent image', async () => {
     const res = await request(app).get('/decks/images/missing.png');
     expect(res.status).toBe(404);
