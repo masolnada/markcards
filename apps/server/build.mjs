@@ -25,36 +25,9 @@ const serverOptions = {
   target: 'node20',
 };
 
-const clientOptions = {
-  entryPoints: ['src/client/index.ts'],
-  outfile: 'dist/client.js',
-  bundle: true,
-  platform: 'browser',
-  // IIFE wraps everything in an immediately-invoked function so the bundle
-  // doesn't pollute the global scope and works as a plain <script> tag.
-  format: 'iife',
-  minify: !watch,
-  target: ['es2020'],
-  sourcemap: watch,
-  define: { __APP_VERSION__: JSON.stringify(version) },
-};
-
 if (watch) {
-  // Watch mode: run all in parallel
   const serverCtx = await esbuild.context(serverOptions);
-  const clientCtx = await esbuild.context(clientOptions);
-
-  await Promise.all([
-    serverCtx.watch(),
-    clientCtx.watch(),
-  ]);
-
-  // Run tailwind in watch mode
-  const tw = spawn(
-    './node_modules/.bin/tailwindcss',
-    ['-i', 'src/client/style.css', '-o', 'dist/client.css', '--watch'],
-    { stdio: 'inherit', shell: true }
-  );
+  await serverCtx.watch();
 
   // Run server with --watch
   const srv = spawn(
@@ -66,17 +39,10 @@ if (watch) {
   console.log('Watching for changes...');
 
   process.on('SIGINT', () => {
-    tw.kill();
     srv.kill();
     process.exit(0);
   });
 } else {
-  // Build mode
-  execSync('./node_modules/.bin/tailwindcss -i src/client/style.css -o dist/client.css --minify', {
-    stdio: 'inherit',
-    shell: true,
-  });
   await esbuild.build(serverOptions);
-  await esbuild.build(clientOptions);
   console.log('Build complete.');
 }
