@@ -13,6 +13,7 @@ ENV APP_VERSION=$APP_VERSION
 COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/client/package.json ./apps/client/
+COPY apps/telegram-bot/package.json ./apps/telegram-bot/
 
 RUN bun install --frozen-lockfile
 
