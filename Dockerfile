@@ -6,7 +6,7 @@ ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
 # Install deps (workspace-aware)
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY apps/markcards/package.json ./apps/markcards/
 COPY packages/ui/package.json ./packages/ui/
 RUN bun install --frozen-lockfile
