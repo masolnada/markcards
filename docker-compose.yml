@@ -17,7 +17,7 @@ services:
       - 1.1.1.1
       - 1.0.0.1
     networks:
-      - proxy_net
+      - internal_net
     healthcheck:
       test: ["CMD", "tailscale", "status"]
       interval: 10s
@@ -53,7 +53,7 @@ services:
       - ${DECKS_DIR:-./decks}:/decks:ro
     restart: unless-stopped
     networks:
-      - proxy_net
+      - internal_net
 
   client:
     build:
@@ -63,7 +63,7 @@ services:
         APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
     networks:
-      - proxy_net
+      - internal_net
 
 volumes:
   markcards_data:
@@ -72,4 +72,4 @@ volumes:
   caddy_config:
 
 networks:
-  proxy_net:
+  internal_net:
