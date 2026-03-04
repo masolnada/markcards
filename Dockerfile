@@ -11,13 +11,13 @@ ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
 COPY package.json bun.lock ./
-COPY apps/markcards/package.json ./apps/markcards/
-COPY packages/ui/package.json ./packages/ui/
+COPY apps/server/package.json ./apps/server/
+COPY apps/client/package.json ./apps/client/
 
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN cd apps/markcards && bun run build
+RUN bun run build
 RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1-slim AS runtime
@@ -27,9 +27,11 @@ RUN groupadd --gid 1001 markcards \
 
 WORKDIR /app
 
-COPY --from=builder --chown=markcards:markcards /app/node_modules          ./node_modules
-COPY --from=builder --chown=markcards:markcards /app/apps/markcards/dist   ./dist
-COPY --from=builder --chown=markcards:markcards /app/apps/markcards/public ./public
+COPY --from=builder --chown=markcards:markcards /app/node_modules             ./node_modules
+COPY --from=builder --chown=markcards:markcards /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=builder --chown=markcards:markcards /app/apps/server/dist         ./apps/server/dist
+COPY --from=builder --chown=markcards:markcards /app/apps/client/dist         ./apps/client/dist
+COPY --from=builder --chown=markcards:markcards /app/apps/client/public       ./apps/client/public
 
 RUN mkdir -p /data /decks && chown markcards:markcards /data /decks
 VOLUME ["/data", "/decks"]
@@ -40,4 +42,4 @@ ENV DB_PATH=/data/markcards.db \
 
 EXPOSE 3000
 USER markcards
-CMD ["bun", "dist/server.mjs"]
+CMD ["bun", "apps/server/dist/server.mjs"]
