@@ -1,3 +1,6 @@
+# Note: This Dockerfile uses Node instead of Bun because the server's CPU lacks
+# AVX support, causing Bun's JavaScriptCore engine to segfault during builds.
+# Track the upstream Bun issue: https://github.com/oven-sh/bun/issues/9423
 FROM node:20-slim AS builder
 
 WORKDIR /app
