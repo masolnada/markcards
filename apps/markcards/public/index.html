@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Markcards</title>
+  <link rel="stylesheet" href="/client.css" />
+  <!-- KaTeX CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
+  <style>
+    /* Prevent flash of unstyled content */
+    body { background: #fff; }
+    @media (prefers-color-scheme: dark) { body { background: #111827; } }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+  <!-- Top navigation -->
+  <nav id="nav" class="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+    <!-- populated by client/index.ts -->
+  </nav>
+
+  <!-- Main content -->
+  <main id="app" class="pb-8">
+    <!-- populated by router -->
+  </main>
+
+  <script src="/client.js"></script>
+</body>
+</html>

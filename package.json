@@ -1,29 +1,15 @@
 {
-  "name": "markcards",
-  "type": "module",
+  "name": "markcards-workspace",
+  "private": true,
+  "packageManager": "bun@1.3.10",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "build": "node build.mjs",
-    "dev": "node build.mjs --watch",
-    "start": "node dist/server.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.6.2",
-    "express": "^4.18.2",
-    "katex": "^0.16.9",
-    "marked": "^12.0.0"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/express": "^4.17.21",
-    "@types/katex": "^0.16.7",
-    "@types/node": "^20.11.5",
-    "@types/supertest": "^6.0.0",
-    "esbuild": "^0.20.0",
-    "supertest": "^6.3.0",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.3.3",
-    "vitest": "^3.0.0"
+    "turbo": "latest"
   }
 }
