@@ -1,28 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
-import { initDb } from '../db.js';
-import { clearDecks, loadDecks, getAllDecks } from '../decks.js';
-import { createApp } from '../index.js';
-import type { ParsedDeck } from '../parser.js';
-
-let tmpDir = '';
-
-vi.mock('../config.js', () => ({
-  config: {
-    get decksDir() { return tmpDir; },
-    dbPath: ':memory:',
-    settingsPath: '',
-    port: 3000,
-    githubRepo: undefined,
-    githubToken: undefined,
-    githubBranch: 'main',
-    githubPath: '',
-    syncTtlMs: 60000,
-  },
-}));
+import { Database } from 'bun:sqlite';
+import { initDb } from '../../infrastructure/db/schema.js';
+import { SqliteCardRepository } from '../../infrastructure/db/sqlite-card-repository.js';
+import { LocalDeckSource } from '../../infrastructure/deck-source/local-deck-source.js';
+import { JsonSettingsRepository } from '../../infrastructure/json-settings-repository.js';
+import { HtmlCardRenderer } from '../../infrastructure/html-card-renderer.js';
+import { DeckService } from '../../application/deck-service.js';
+import { ReviewService } from '../../application/review-service.js';
+import { createApp } from '../../http/app.js';
+import type { Deck } from '../../domain/card.js';
 
 const DECK_CONTENT = [
   'Q: What does this show?',
@@ -34,13 +24,13 @@ const DECK_CONTENT = [
   'C: The capital of France is [Paris] ![map](assets/map.png)',
 ].join('\n');
 
-let deck: ParsedDeck;
+let tmpDir = '';
+let deck: Deck;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = mkdtempSync(join(os.tmpdir(), 'markcards-img-test-'));
-  const tmpDb = join(tmpDir, 'test.db');
 
   // Create deck file
   writeFileSync(join(tmpDir, 'img-deck.md'), DECK_CONTENT);
@@ -52,12 +42,20 @@ beforeEach(() => {
   mkdirSync(join(tmpDir, 'assets'));
   writeFileSync(join(tmpDir, 'assets', 'map.png'), 'MAP_DATA');
 
-  initDb(tmpDb);
-  clearDecks();
-  loadDecks(tmpDir);
+  const db = new Database(join(tmpDir, 'test.db'));
+  initDb(db);
+  const cardRepo = new SqliteCardRepository(db);
+  const deckSource = new LocalDeckSource(tmpDir, cardRepo);
+  await deckSource.sync(true);
 
-  deck = getAllDecks().find(d => d.name === 'img-deck')!;
-  app = createApp();
+  deck = deckSource.getAll().find(d => d.name === 'img-deck')!;
+
+  const settingsRepo = new JsonSettingsRepository(join(tmpDir, 'settings.json'));
+  // Pass tmpDir as decksDir so image URLs are resolved against it
+  const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
+  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
+  app = createApp(deckService, reviewService, tmpDir);
 });
 
 afterEach(() => {

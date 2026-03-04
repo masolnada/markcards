@@ -3,11 +3,16 @@ import request from 'supertest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
-import { initDb } from '../db.js';
-import { clearDecks, loadDecks, getAllDecks } from '../decks.js';
-import { initSettings } from '../settings.js';
-import { createApp } from '../index.js';
-import type { ParsedDeck } from '../parser.js';
+import { Database } from 'bun:sqlite';
+import { initDb } from '../../infrastructure/db/schema.js';
+import { SqliteCardRepository } from '../../infrastructure/db/sqlite-card-repository.js';
+import { LocalDeckSource } from '../../infrastructure/deck-source/local-deck-source.js';
+import { JsonSettingsRepository } from '../../infrastructure/json-settings-repository.js';
+import { HtmlCardRenderer } from '../../infrastructure/html-card-renderer.js';
+import { DeckService } from '../../application/deck-service.js';
+import { ReviewService } from '../../application/review-service.js';
+import { createApp } from '../../http/app.js';
+import type { Deck } from '../../domain/card.js';
 
 const DECK_CONTENT = [
   'Q: Card one?',
@@ -22,23 +27,32 @@ const DECK_CONTENT = [
 
 let tmpDir: string;
 let settingsFile: string;
-let deck: ParsedDeck;
+let deck: Deck;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any;
+let cardRepo: SqliteCardRepository;
+let deckSource: LocalDeckSource;
+let settingsRepo: JsonSettingsRepository;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = mkdtempSync(join(os.tmpdir(), 'markcards-settings-test-'));
   settingsFile = join(tmpDir, 'settings.json');
 
   writeFileSync(join(tmpDir, 'deck.md'), DECK_CONTENT);
 
-  initDb(join(tmpDir, 'test.db'));
-  initSettings(settingsFile);
-  clearDecks();
-  loadDecks(tmpDir);
+  const db = new Database(join(tmpDir, 'test.db'));
+  initDb(db);
+  cardRepo = new SqliteCardRepository(db);
+  deckSource = new LocalDeckSource(tmpDir, cardRepo);
+  await deckSource.sync(true);
 
-  deck = getAllDecks()[0];
-  app = createApp();
+  deck = deckSource.getAll()[0];
+  settingsRepo = new JsonSettingsRepository(settingsFile);
+
+  const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
+  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
+  app = createApp(deckService, reviewService, tmpDir);
 });
 
 afterEach(() => {

@@ -1,14 +1,19 @@
-export interface GitHubConfig {
+import { parseDeck } from '../parser.js';
+import type { Deck } from '../../domain/card.js';
+import type { DeckSource } from '../../application/ports/deck-source.js';
+import type { CardRepository } from '../../application/ports/card-repository.js';
+
+interface GitHubConfig {
   owner: string;
   repo: string;
   branch: string;
-  path: string;        // subdirectory prefix, e.g. "decks" or ""
+  path: string;
   token?: string;
 }
 
-export interface GitHubFile {
-  virtualPath: string; // e.g. "github:owner/repo/decks/sample.md"
-  content: string;     // raw markdown
+interface GitHubFile {
+  virtualPath: string;
+  content: string;
 }
 
 function buildHeaders(token?: string): Record<string, string> {
@@ -21,11 +26,10 @@ function buildHeaders(token?: string): Record<string, string> {
   return headers;
 }
 
-export async function fetchGitHubDecks(cfg: GitHubConfig): Promise<GitHubFile[]> {
+async function fetchGitHubDecks(cfg: GitHubConfig): Promise<GitHubFile[]> {
   const { owner, repo, branch, path: pathPrefix, token } = cfg;
   const headers = buildHeaders(token);
 
-  // 1. Fetch the full recursive tree
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
   const treeRes = await fetch(treeUrl, { headers });
   if (!treeRes.ok) {
@@ -34,7 +38,6 @@ export async function fetchGitHubDecks(cfg: GitHubConfig): Promise<GitHubFile[]>
   }
   const tree = await treeRes.json() as { tree: Array<{ path: string; type: string }> };
 
-  // 2. Filter to .md files under the configured path prefix
   const mdFiles = tree.tree.filter(item => {
     if (item.type !== 'blob') return false;
     if (!item.path.endsWith('.md')) return false;
@@ -44,7 +47,6 @@ export async function fetchGitHubDecks(cfg: GitHubConfig): Promise<GitHubFile[]>
 
   if (mdFiles.length === 0) return [];
 
-  // 3. Fetch each file's content
   const results: GitHubFile[] = [];
   for (const file of mdFiles) {
     const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}?ref=${branch}`;
@@ -66,4 +68,47 @@ export async function fetchGitHubDecks(cfg: GitHubConfig): Promise<GitHubFile[]>
   }
 
   return results;
+}
+
+export class GithubDeckSource implements DeckSource {
+  private registry = new Map<string, Deck>();
+  private lastSyncAt = 0;
+
+  constructor(
+    private cfg: GitHubConfig,
+    private syncTtlMs: number,
+    private cards: CardRepository,
+  ) {}
+
+  getAll(): Deck[] {
+    return Array.from(this.registry.values());
+  }
+
+  getById(id: string): Deck | undefined {
+    return this.registry.get(id);
+  }
+
+  async sync(force = false): Promise<void> {
+    const now = Date.now();
+    if (!force && now - this.lastSyncAt <= this.syncTtlMs) return;
+
+    try {
+      console.log(`Syncing decks from GitHub: ${this.cfg.owner}/${this.cfg.repo}`);
+      const files = await fetchGitHubDecks(this.cfg);
+      const syncTime = new Date();
+
+      for (const { virtualPath, content } of files) {
+        const deck = parseDeck(virtualPath, content);
+        this.registry.set(deck.id, deck);
+        for (const card of deck.cards) {
+          this.cards.ensure(card.id, deck.id, card.type, card.clozeIndex ?? null, syncTime);
+        }
+      }
+
+      this.lastSyncAt = Date.now();
+      console.log(`GitHub sync complete: ${files.length} deck(s) loaded`);
+    } catch (err) {
+      console.error('GitHub sync failed:', err);
+    }
+  }
 }

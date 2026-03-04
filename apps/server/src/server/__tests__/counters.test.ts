@@ -2,10 +2,10 @@
  * Integration tests for review counters and daily new-card limit logic.
  *
  * Scenarios covered:
- *  - countNewCardsReviewedToday: zero when nothing reviewed, 1 after first review,
+ *  - countNewReviewedToday: zero when nothing reviewed, 1 after first review,
  *    still 1 after card is reviewed a second time in the same session (Again→Good),
  *    0 for a card whose first review was yesterday.
- *  - getDeckStats due count: new-card limit applied correctly; review cards (state>0)
+ *  - getStats due count: new-card limit applied correctly; review cards (state>0)
  *    always counted regardless of limit.
  *  - Global review queue: new cards capped at maxNewPerDay total.
  *  - Per-deck review queue: a deck with new cards is not starved by other decks that
@@ -19,30 +19,27 @@ import request from 'supertest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
-import {
-  initDb,
-  ensureCard,
-  updateCard,
-  getDeckStats,
-  countNewCardsReviewedToday,
-  getCard,
-  getNewCardIdsForQueue,
-} from '../db.js';
-import { schedule } from '../fsrs.js';
-import type { Rating } from '../fsrs.js';
-import { clearDecks, loadDecks, getAllDecks } from '../decks.js';
-import { initSettings } from '../settings.js';
-import { createApp } from '../index.js';
-import type { ParsedDeck } from '../parser.js';
+import { Database } from 'bun:sqlite';
+import { initDb } from '../../infrastructure/db/schema.js';
+import { SqliteCardRepository } from '../../infrastructure/db/sqlite-card-repository.js';
+import { LocalDeckSource } from '../../infrastructure/deck-source/local-deck-source.js';
+import { JsonSettingsRepository } from '../../infrastructure/json-settings-repository.js';
+import { HtmlCardRenderer } from '../../infrastructure/html-card-renderer.js';
+import { DeckService } from '../../application/deck-service.js';
+import { ReviewService } from '../../application/review-service.js';
+import { createApp } from '../../http/app.js';
+import { schedule } from '../../domain/fsrs.js';
+import type { Rating } from '../../domain/fsrs.js';
+import type { Deck } from '../../domain/card.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function doReview(cardId: string, rating: Rating, at: Date): void {
-  const card = getCard(cardId)!;
+function doReview(repo: SqliteCardRepository, cardId: string, rating: Rating, at: Date): void {
+  const card = repo.findById(cardId)!;
   const result = schedule(card, rating, at);
-  updateCard(cardId, result.card, rating);
+  repo.save(cardId, result.card, rating);
 }
 
 /** today's local midnight */
@@ -58,16 +55,19 @@ function yesterday(): Date {
 }
 
 // ---------------------------------------------------------------------------
-// countNewCardsReviewedToday — direct DB-function tests
+// countNewReviewedToday — direct DB-function tests
 // ---------------------------------------------------------------------------
 
-describe('countNewCardsReviewedToday', () => {
+describe('countNewReviewedToday', () => {
   let tmpDir: string;
+  let cardRepo: SqliteCardRepository;
   const now = new Date();
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(os.tmpdir(), 'markcards-counters-'));
-    initDb(join(tmpDir, 'test.db'));
+    const db = new Database(join(tmpDir, 'test.db'));
+    initDb(db);
+    cardRepo = new SqliteCardRepository(db);
   });
 
   afterEach(() => {
@@ -75,80 +75,83 @@ describe('countNewCardsReviewedToday', () => {
   });
 
   it('returns 0 when no cards have been reviewed', () => {
-    ensureCard('c1', 'deck-x', 'qa', null, now);
-    expect(countNewCardsReviewedToday(now)).toBe(0);
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
+    expect(cardRepo.countNewReviewedToday(now)).toBe(0);
   });
 
   it('returns 1 after a new card is reviewed once (Good)', () => {
-    ensureCard('c1', 'deck-x', 'qa', null, now);
-    doReview('c1', 3, now);
-    expect(countNewCardsReviewedToday(now)).toBe(1);
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
+    doReview(cardRepo, 'c1', 3, now);
+    expect(cardRepo.countNewReviewedToday(now)).toBe(1);
   });
 
   it('returns 1 after a new card is reviewed once (Easy — goes straight to Review state)', () => {
-    ensureCard('c1', 'deck-x', 'qa', null, now);
-    doReview('c1', 4, now); // Easy: New→Review, reps=1, state=2
-    expect(countNewCardsReviewedToday(now)).toBe(1);
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
+    doReview(cardRepo, 'c1', 4, now); // Easy: New→Review, reps=1, state=2
+    expect(cardRepo.countNewReviewedToday(now)).toBe(1);
   });
 
   it('still returns 1 after a card is reviewed Again then Good in the same session (reps rises to 2)', () => {
     // This is the regression for the `reps = 1` bug:
     // after the second review reps becomes 2, which the old query missed.
-    ensureCard('c1', 'deck-x', 'qa', null, now);
-    doReview('c1', 1, now); // Again: New→Learning, reps=1
-    expect(countNewCardsReviewedToday(now)).toBe(1); // sanity check mid-session
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
+    doReview(cardRepo, 'c1', 1, now); // Again: New→Learning, reps=1
+    expect(cardRepo.countNewReviewedToday(now)).toBe(1); // sanity check mid-session
 
-    doReview('c1', 3, now); // Good: Learning→Review, reps=2
-    expect(countNewCardsReviewedToday(now)).toBe(1); // must STILL be 1
+    doReview(cardRepo, 'c1', 3, now); // Good: Learning→Review, reps=2
+    expect(cardRepo.countNewReviewedToday(now)).toBe(1); // must STILL be 1
   });
 
   it('returns 0 for a card whose first review was yesterday', () => {
     const yd = yesterday();
-    ensureCard('c1', 'deck-x', 'qa', null, yd);
-    doReview('c1', 3, yd); // reviewed yesterday
-    expect(countNewCardsReviewedToday(now)).toBe(0);
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, yd);
+    doReview(cardRepo, 'c1', 3, yd); // reviewed yesterday
+    expect(cardRepo.countNewReviewedToday(now)).toBe(0);
   });
 
   it('counts multiple distinct cards reviewed today', () => {
     for (let i = 0; i < 3; i++) {
-      ensureCard(`c${i}`, 'deck-x', 'qa', null, now);
-      doReview(`c${i}`, 3, now);
+      cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
+      doReview(cardRepo, `c${i}`, 3, now);
     }
-    expect(countNewCardsReviewedToday(now)).toBe(3);
+    expect(cardRepo.countNewReviewedToday(now)).toBe(3);
   });
 
   it('does not double-count a card reviewed many times today', () => {
-    ensureCard('c1', 'deck-x', 'qa', null, now);
-    doReview('c1', 1, now); // Again → Learning, reps=1
-    doReview('c1', 1, now); // Again → Learning, reps=2
-    doReview('c1', 3, now); // Good → Review, reps=3
-    expect(countNewCardsReviewedToday(now)).toBe(1);
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
+    doReview(cardRepo, 'c1', 1, now); // Again → Learning, reps=1
+    doReview(cardRepo, 'c1', 1, now); // Again → Learning, reps=2
+    doReview(cardRepo, 'c1', 3, now); // Good → Review, reps=3
+    expect(cardRepo.countNewReviewedToday(now)).toBe(1);
   });
 
   it('does not count a review-state card reviewed today as a new card consumed', () => {
     // Simulate a card that was first reviewed yesterday (used a slot yesterday)
     // and is reviewed again today from Review state — should NOT consume today's slot.
     const yd = yesterday();
-    ensureCard('c1', 'deck-x', 'qa', null, yd);
-    doReview('c1', 4, yd); // Easy: New→Review yesterday
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, yd);
+    doReview(cardRepo, 'c1', 4, yd); // Easy: New→Review yesterday
 
     // Today the card is due and reviewed again
-    doReview('c1', 3, now); // Good from Review state today
-    expect(countNewCardsReviewedToday(now)).toBe(0);
+    doReview(cardRepo, 'c1', 3, now); // Good from Review state today
+    expect(cardRepo.countNewReviewedToday(now)).toBe(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// getDeckStats due count
+// getStats due count
 // ---------------------------------------------------------------------------
 
-describe('getDeckStats', () => {
+describe('getStats', () => {
   let tmpDir: string;
+  let cardRepo: SqliteCardRepository;
   const now = new Date();
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(os.tmpdir(), 'markcards-counters-'));
-    initDb(join(tmpDir, 'test.db'));
+    const db = new Database(join(tmpDir, 'test.db'));
+    initDb(db);
+    cardRepo = new SqliteCardRepository(db);
   });
 
   afterEach(() => {
@@ -156,56 +159,56 @@ describe('getDeckStats', () => {
   });
 
   it('counts all new cards as due when limit is Infinity', () => {
-    for (let i = 0; i < 5; i++) ensureCard(`c${i}`, 'deck-x', 'qa', null, now);
-    const stats = getDeckStats('deck-x', now);
+    for (let i = 0; i < 5; i++) cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
+    const stats = cardRepo.getStats('deck-x', now);
     expect(stats.total).toBe(5);
     expect(stats.due).toBe(5);
     expect(stats.newCards).toBe(5);
   });
 
   it('caps due new cards at newLimit', () => {
-    for (let i = 0; i < 5; i++) ensureCard(`c${i}`, 'deck-x', 'qa', null, now);
-    const stats = getDeckStats('deck-x', now, 3);
+    for (let i = 0; i < 5; i++) cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
+    const stats = cardRepo.getStats('deck-x', now, 3);
     expect(stats.due).toBe(3);
     expect(stats.newCards).toBe(5); // total new unchanged
   });
 
   it('shows 0 new due cards when newLimit is 0', () => {
-    for (let i = 0; i < 3; i++) ensureCard(`c${i}`, 'deck-x', 'qa', null, now);
-    const stats = getDeckStats('deck-x', now, 0);
+    for (let i = 0; i < 3; i++) cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
+    const stats = cardRepo.getStats('deck-x', now, 0);
     expect(stats.due).toBe(0);
   });
 
   it('always counts review-state (state>0) due cards regardless of newLimit', () => {
     // Create a card and graduate it to Review state
-    ensureCard('r1', 'deck-x', 'qa', null, now);
+    cardRepo.ensure('r1', 'deck-x', 'qa', null, now);
     // Manually advance it: review as Easy to go New→Review, then set due to now
-    doReview('r1', 4, yesterday()); // reviewed yesterday → now in Review with some future due
+    doReview(cardRepo, 'r1', 4, yesterday()); // reviewed yesterday → now in Review with some future due
     // Force due date to now by reviewing again... or just add a new card in review state directly
     // Actually easier: add 2 new cards + put them in review state, then add 3 new cards
-    ensureCard('new1', 'deck-x', 'qa', null, now);
-    ensureCard('new2', 'deck-x', 'qa', null, now);
+    cardRepo.ensure('new1', 'deck-x', 'qa', null, now);
+    cardRepo.ensure('new2', 'deck-x', 'qa', null, now);
 
     // r1 was reviewed yesterday with Easy → state=2, due = yesterday + stability days (>= 1 day from now)
     // So it's NOT due today yet. We need a review card that IS due now.
     // Let's use Again to create a Relearning card with short interval instead:
-    ensureCard('r2', 'deck-x', 'qa', null, now);
-    doReview('r2', 4, yesterday()); // New→Review, reps=1
+    cardRepo.ensure('r2', 'deck-x', 'qa', null, now);
+    doReview(cardRepo, 'r2', 4, yesterday()); // New→Review, reps=1
     // After Easy, scheduled_days = round(stability * W[16]). Due is yesterday + that many days.
     // Might not be due today. Let's use a direct approach: create a Learning card (state=1) due now.
-    ensureCard('r3', 'deck-x', 'qa', null, now);
-    doReview('r3', 1, now); // Again: New→Learning (state=1), due in 1 minute from now = due soon
+    cardRepo.ensure('r3', 'deck-x', 'qa', null, now);
+    doReview(cardRepo, 'r3', 1, now); // Again: New→Learning (state=1), due in 1 minute from now = due soon
     // Learning card due in 1 minute is NOT due yet if we check "now" before 1 minute has elapsed.
     // For simplicity: just test that review-state cards with due<=now are counted.
     // We know r3 is now state=1 with due = now+1min, so it's not due at `now`.
     // Instead, let's use a well-known approach: review with Good from Learning immediately.
-    // Easier: set up via ensureCard with a past date so the card is already overdue.
+    // Easier: set up via ensure with a past date so the card is already overdue.
     const past = new Date(now.getTime() - 2 * 60 * 1000); // 2 minutes ago
-    ensureCard('r4', 'deck-x', 'qa', null, past);
-    doReview('r4', 1, past); // Again from New at past → state=1, due = past+1min = 1min ago = due now
+    cardRepo.ensure('r4', 'deck-x', 'qa', null, past);
+    doReview(cardRepo, 'r4', 1, past); // Again from New at past → state=1, due = past+1min = 1min ago = due now
 
     // Now r4 is in Learning state and due (1 min ago). newLimit=0 must not hide it.
-    const stats = getDeckStats('deck-x', now, 0);
+    const stats = cardRepo.getStats('deck-x', now, 0);
     expect(stats.due).toBeGreaterThanOrEqual(1); // r4 must appear in due
   });
 });
@@ -218,27 +221,34 @@ const DECK_A = ['Q: A1?', 'A: a1', '', 'Q: A2?', 'A: a2', '', 'Q: A3?', 'A: a3']
 const DECK_B = ['Q: B1?', 'A: b1', '', 'Q: B2?', 'A: b2', '', 'Q: B3?', 'A: b3'].join('\n');
 
 let tmpDir: string;
-let deckA: ParsedDeck;
-let deckB: ParsedDeck;
+let deckA: Deck;
+let deckB: Deck;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any;
+let cardRepo: SqliteCardRepository;
+let deckSource: LocalDeckSource;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = mkdtempSync(join(os.tmpdir(), 'markcards-counters-api-'));
-  initDb(join(tmpDir, 'test.db'));
-  initSettings(join(tmpDir, 'settings.json'));
+  const db = new Database(join(tmpDir, 'test.db'));
+  initDb(db);
+  cardRepo = new SqliteCardRepository(db);
 
   writeFileSync(join(tmpDir, 'deck-a.md'), DECK_A);
   writeFileSync(join(tmpDir, 'deck-b.md'), DECK_B);
 
-  clearDecks();
-  loadDecks(tmpDir);
+  deckSource = new LocalDeckSource(tmpDir, cardRepo);
+  await deckSource.sync(true);
 
-  const decks = getAllDecks();
+  const decks = deckSource.getAll();
   deckA = decks.find(d => d.name === 'deck-a')!;
   deckB = decks.find(d => d.name === 'deck-b')!;
 
-  app = createApp();
+  const settingsRepo = new JsonSettingsRepository(join(tmpDir, 'settings.json'));
+  const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
+  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
+  app = createApp(deckService, reviewService, tmpDir);
 });
 
 afterEach(() => {
@@ -295,7 +305,7 @@ describe('Global new-card cap', () => {
 });
 
 describe('Per-deck new-card queue is not starved by other decks', () => {
-  // Regression: the old implementation called getNewCardIdsForQueue(now, globalLimit)
+  // Regression: the old implementation called getNewIdsForQueue(now, globalLimit)
   // then filtered by deckId. If the global limit was filled by cards from other decks
   // (which sort earlier by `due`), the requested deck got 0 new cards despite having budget.
 
@@ -346,7 +356,7 @@ describe('Daily budget counter is correct across multiple reviews of the same ca
 
     await request(app).post('/api/review').send({ cardId: firstCard.cardId, pass: false }); // Again → Learning, reps=1
     // The card is now in Learning state and due in ~1 min (not in new queue anymore).
-    // From this point, countNewCardsReviewedToday should be 1.
+    // From this point, countNewReviewedToday should be 1.
 
     // Review a second new card
     const queueSecond = await request(app).get(`/api/review/${deckA.id}`);

@@ -3,10 +3,16 @@ import request from 'supertest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
-import { initDb } from '../db.js';
-import { clearDecks, loadDecks, getAllDecks } from '../decks.js';
-import { createApp } from '../index.js';
-import type { ParsedDeck } from '../parser.js';
+import { Database } from 'bun:sqlite';
+import { initDb } from '../../infrastructure/db/schema.js';
+import { SqliteCardRepository } from '../../infrastructure/db/sqlite-card-repository.js';
+import { LocalDeckSource } from '../../infrastructure/deck-source/local-deck-source.js';
+import { JsonSettingsRepository } from '../../infrastructure/json-settings-repository.js';
+import { HtmlCardRenderer } from '../../infrastructure/html-card-renderer.js';
+import { DeckService } from '../../application/deck-service.js';
+import { ReviewService } from '../../application/review-service.js';
+import { createApp } from '../../http/app.js';
+import type { Deck } from '../../domain/card.js';
 
 const DECK_A_CONTENT = [
   'Q: What is 2+2?',
@@ -24,27 +30,33 @@ const DECK_B_CONTENT = [
 ].join('\n');
 
 let tmpDir: string;
-let deckA: ParsedDeck;
-let deckB: ParsedDeck;
+let deckA: Deck;
+let deckB: Deck;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any;
+let deckSource: LocalDeckSource;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = mkdtempSync(join(os.tmpdir(), 'markcards-test-'));
-  const tmpDb = join(tmpDir, 'test.db');
 
   writeFileSync(join(tmpDir, 'deck-a.md'), DECK_A_CONTENT);
   writeFileSync(join(tmpDir, 'deck-b.md'), DECK_B_CONTENT);
 
-  initDb(tmpDb);
-  clearDecks();
-  loadDecks(tmpDir);
+  const db = new Database(join(tmpDir, 'test.db'));
+  initDb(db);
+  const cardRepo = new SqliteCardRepository(db);
+  deckSource = new LocalDeckSource(tmpDir, cardRepo);
+  await deckSource.sync(true);
 
-  const decks = getAllDecks();
+  const decks = deckSource.getAll();
   deckA = decks.find(d => d.name === 'deck-a')!;
   deckB = decks.find(d => d.name === 'deck-b')!;
 
-  app = createApp();
+  const settingsRepo = new JsonSettingsRepository(join(tmpDir, 'settings.json'));
+  const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
+  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
+  app = createApp(deckService, reviewService, tmpDir);
 });
 
 afterEach(() => {

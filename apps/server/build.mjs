@@ -13,7 +13,7 @@ const watch = process.argv.includes('--watch');
 if (!existsSync('dist')) mkdirSync('dist');
 
 const serverOptions = {
-  entryPoints: ['src/server/index.ts'],
+  entryPoints: ['src/http/app.ts'],
   outfile: 'dist/server.mjs',
   bundle: true,
   platform: 'node',
