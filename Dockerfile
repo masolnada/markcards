@@ -20,7 +20,8 @@ COPY apps/telegram-bot/package.json ./apps/telegram-bot/
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun run build
+RUN cd apps/server && bun run build
+RUN cd apps/client && bun run build
 RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1-slim AS runtime
