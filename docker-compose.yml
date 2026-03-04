@@ -1,0 +1,43 @@
+services:
+  caddy:
+    image: caddy:alpine
+    ports:
+      - "${PORT:-80}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+    depends_on:
+      - server
+      - client
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    volumes:
+      - markcards-data:/data
+      - ${DECKS_DIR:-./decks}:/decks:ro
+    restart: unless-stopped
+
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    restart: unless-stopped
+
+  telegram-bot:
+    build:
+      context: apps/telegram-bot
+      dockerfile: Dockerfile
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ALLOWED_USER_IDS: ${ALLOWED_USER_IDS:-}
+    restart: unless-stopped
+
+volumes:
+  markcards-data:
