@@ -12,7 +12,7 @@ COPY packages/ui/package.json ./packages/ui/
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun run build
+RUN bunx turbo run build --concurrency=1
 
 FROM oven/bun:1-slim AS runtime
 
