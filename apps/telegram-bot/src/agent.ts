@@ -28,7 +28,7 @@ Output ONLY valid JSON array (no markdown fences):
   {
     "filePath": "subject/area/topic.md",
     "deckName": "Topic Name",
-    "cards": "---\\n\\nQ: ...\\n\\nA: ...\\n\\n---\\n\\nQ: ...\\n\\nA: ..."
+    "cards": "---\\n\\nQ: ...\\nA: ...\\n\\n---\\n\\nQ: ...\\nA: ..."
   }
 ]
 
@@ -36,7 +36,7 @@ Rules:
 - Each card must be atomic: one concept per card.
 - filePath and deckName must always be in English. Format is always subject/area/topic.md (exactly 3 levels, lowercase).
 - Card content (Q/A) must be in the same language as the source material.
-- Each card starts with "---" on its own line, followed by a blank line, then "Q: " and "A: " each separated by blank lines.
+- Each card starts with "---" followed by a blank line, then "Q: " and "A: " on consecutive lines (no blank line between Q and A).
 - Do NOT generate cards for concepts already covered in the existing cards provided.
 - Pay special attention to any text written or highlighted in red — these mark concepts where the student struggled or needed help. Prioritize generating cards for those concepts.`;
 
