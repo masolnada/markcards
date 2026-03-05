@@ -8,6 +8,21 @@ const headers = (token: string) => ({
   'Content-Type': 'application/json',
 });
 
+export async function getFileContent(
+  owner: string,
+  repo: string,
+  filePath: string,
+  token: string,
+): Promise<string | null> {
+  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath}?ref=main`, {
+    headers: headers(token),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub GET failed: ${res.status} ${await res.text()}`);
+  const data = (await res.json()) as { content: string };
+  return Buffer.from(data.content, 'base64').toString('utf-8');
+}
+
 export async function appendOrCreateFile(
   owner: string,
   repo: string,

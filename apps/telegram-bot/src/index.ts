@@ -1,6 +1,6 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import { generateCards } from './agent.js';
-import { appendOrCreateFile } from './github.js';
+import { classifyImage, generateCards } from './agent.js';
+import { getFileContent, appendOrCreateFile } from './github.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) throw new Error('TELEGRAM_BOT_TOKEN is required');
@@ -53,8 +53,12 @@ function approveDiscardKeyboard() {
 }
 
 async function sendGeneratedCards(chatId: number, userId: number, imageBuffer: ArrayBuffer, caption: string | undefined, placeholder: { message_id: number }) {
-  const result = await generateCards(imageBuffer, caption);
-  const filePath = `${githubBasePath}/${result.filePath}`;
+  const { filePath: relPath, deckName } = await classifyImage(imageBuffer, caption);
+  const filePath = `${githubBasePath}/${relPath}`;
+  const existingCards = await getFileContent(githubOwner, githubRepo, filePath, githubToken).catch(() => null);
+  const result = await generateCards(imageBuffer, caption, existingCards);
+  result.filePath = relPath;
+  result.deckName = deckName;
 
   await bot.api.deleteMessage(chatId, placeholder.message_id);
   await bot.api.sendMessage(chatId, `📁 \`${filePath}\``, { parse_mode: 'Markdown' });
