@@ -11,12 +11,12 @@
 
 	@markcards host markcards.{$DOMAIN}
 	handle @markcards {
-		reverse_proxy client:3001
-	}
-
-	@markcards-api host markcards-api.{$DOMAIN}
-	handle @markcards-api {
-		reverse_proxy server:3000
+		handle /api/* {
+			reverse_proxy server:3000
+		}
+		handle {
+			reverse_proxy client:3001
+		}
 	}
 
 	handle {
