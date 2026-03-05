@@ -49,9 +49,12 @@ services:
       dockerfile: apps/server/Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-dev}
+    environment:
+      - GITHUB_REPO=${GITHUB_REPO}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_PATH=cards
     volumes:
       - markcards_data:/data
-      - ${DECKS_DIR:-./decks}:/decks:ro
     restart: unless-stopped
     networks:
       - internal_net
