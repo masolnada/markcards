@@ -3,7 +3,7 @@ services:
     image: tailscale/tailscale:latest@sha256:21df0b5a84efa35c0a507f4dd2340e1b1295683634a28968707354d5bd991d9c
     container_name: markcards-tailscale
     restart: unless-stopped
-    hostname: markcards
+    hostname: ${VM_NAME:-markcards}-gw
     cap_add:
       - NET_ADMIN
       - SYS_MODULE

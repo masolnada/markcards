@@ -23,7 +23,7 @@ CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
 TAILSCALE_AUTHKEY=${TAILSCALE_AUTHKEY:-}
 GITHUB_REPO=${GITHUB_REPO:-}
 GITHUB_TOKEN=${GITHUB_TOKEN:-}
-DECKS_DIR=${DECKS_DIR:-/decks}
+DECKS_DIR=${DECKS_DIR:-/opt/markcards/decks}
 
 # ── Validate required vars ─────────────────────────────────────────────
 if [ -z "$SSH_PUB_KEY" ]; then
@@ -90,16 +90,17 @@ mkdir -p "$SNIPPET_DIR"
 
 cat > "$SNIPPET_FILE" <<EOF
 #cloud-config
+hostname: ${VM_NAME}-host
 ssh_pwauth: false
 package_update: true
 packages:
   - git
-  - jq
 
 write_files:
-  - path: /opt/markcards/.env
+  - path: /tmp/markcards.env
     permissions: '0600'
     content: |
+      VM_NAME=$VM_NAME
       DOMAIN=$DOMAIN
       ACME_EMAIL=$ACME_EMAIL
       CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN
@@ -109,11 +110,10 @@ write_files:
       DECKS_DIR=$DECKS_DIR
 
 runcmd:
-  - git clone $REPO_URL /opt/markcards-repo
-  - cp /opt/markcards/.env /opt/markcards-repo/.env
-  - rm -rf /opt/markcards
-  - mv /opt/markcards-repo /opt/markcards
-  - chown -R $VM_USER:$VM_USER /opt/markcards
+  - git clone $REPO_URL /opt/markcards
+  - mv /tmp/markcards.env /opt/markcards/.env
+  - mkdir -p $DECKS_DIR
+  - chown -R $VM_USER:$VM_USER /opt/markcards $DECKS_DIR
   - chmod +x /opt/markcards/.deploy/install.sh /opt/markcards/.deploy/start.sh
   - /opt/markcards/.deploy/install.sh
   - /opt/markcards/.deploy/start.sh
@@ -134,9 +134,9 @@ echo "  Host:     $VM_NAME.local"
 echo "  Auth:     SSH key only (password disabled)"
 echo ""
 echo "Cloud-init will automatically:"
-echo "  1. Install git, jq and Docker"
-echo "  2. Clone the repo to /opt/markcards"
-echo "  3. Write .env with provided credentials"
-echo "  4. Run .deploy/start.sh"
+echo "  1. Clone the repo to /opt/markcards"
+echo "  2. Write .env with provided credentials"
+echo "  3. Run .deploy/install.sh (Docker + Tailscale)"
+echo "  4. Run .deploy/start.sh (docker compose up)"
 echo ""
 echo "Monitor progress: ssh $VM_USER@$VM_NAME.local 'sudo cloud-init status --wait'"

@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Load .env if present
+if [ -f "$REPO_DIR/.env" ]; then
+  set -o allexport
+  # shellcheck disable=SC1091
+  source "$REPO_DIR/.env"
+  set +o allexport
+fi
+
 # ── Docker ────────────────────────────────────────────────────────────
 install_docker() {
   if command -v docker &>/dev/null; then
@@ -24,16 +34,36 @@ install_docker() {
   echo "==> Docker installed: $(docker --version)"
 }
 
+# ── Tailscale ─────────────────────────────────────────────────────────
+install_tailscale() {
+  if command -v tailscale &>/dev/null; then
+    echo "==> Tailscale already installed: $(tailscale version | head -1)"
+    return
+  fi
+
+  echo "==> Installing Tailscale..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+
+  echo "==> Enabling Tailscale service..."
+  sudo systemctl enable --now tailscaled
+
+  if [ -n "${TAILSCALE_AUTHKEY:-}" ]; then
+    echo "==> Joining Tailnet..."
+    sudo tailscale up --authkey "$TAILSCALE_AUTHKEY" --accept-routes
+  else
+    echo "    ⚠️  TAILSCALE_AUTHKEY not set — skipping tailscale up"
+  fi
+
+  echo "==> Tailscale installed."
+}
+
 # ── Main ──────────────────────────────────────────────────────────────
 echo "Markcards dependency installer"
 echo "==============================="
 echo ""
 
 install_docker
+install_tailscale
 
 echo ""
 echo "Installation complete!"
-echo ""
-echo "Next steps:"
-echo "  1. Log out and back in for docker group membership to take effect"
-echo "  2. Run: .deploy/init.sh"
