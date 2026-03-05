@@ -1,29 +1,29 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { generateText } from "ai";
+import { GoogleGenAI } from "@google/genai";
 
 interface AgentInput {
   text?: string;
   imageBuffer?: ArrayBuffer;
 }
 
-const gemini = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
 export async function runAgent({
   text,
   imageBuffer,
 }: AgentInput): Promise<string> {
-  const content = [
-    ...(imageBuffer ? [{ type: "image" as const, image: imageBuffer }] : []),
-    {
-      type: "text" as const,
-      text: text || (imageBuffer ? "Describe what you see in this image." : ""),
-    },
-  ];
+  const contents: object[] = [];
 
-  const { text: result } = await generateText({
-    model: gemini("gemini-3-flash-preview"),
-    messages: [{ role: "user", content }],
+  if (imageBuffer) {
+    const base64 = Buffer.from(imageBuffer).toString("base64");
+    contents.push({ inlineData: { mimeType: "image/jpeg", data: base64 } });
+  }
+
+  contents.push({ text: text || (imageBuffer ? "Describe what you see in this image." : "") });
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents,
   });
 
-  return result;
+  return response.text ?? "";
 }
