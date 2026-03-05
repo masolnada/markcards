@@ -95,6 +95,7 @@ ssh_pwauth: false
 package_update: true
 packages:
   - git
+  - qemu-guest-agent
 
 write_files:
   - path: /tmp/markcards.env
@@ -110,13 +111,13 @@ write_files:
       DECKS_DIR=$DECKS_DIR
 
 runcmd:
+  - systemctl enable --now qemu-guest-agent
   - git clone $REPO_URL /opt/markcards
   - mv /tmp/markcards.env /opt/markcards/.env
   - mkdir -p $DECKS_DIR
   - chown -R $VM_USER:$VM_USER /opt/markcards $DECKS_DIR
   - chmod +x /opt/markcards/.deploy/install.sh /opt/markcards/.deploy/start.sh
   - /opt/markcards/.deploy/install.sh
-#   - /opt/markcards/.deploy/start.sh
 EOF
 
 qm set "$VMID" --cicustom "vendor=local:snippets/markcards-cloud-init.yml"
