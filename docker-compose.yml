@@ -69,6 +69,20 @@ services:
     networks:
       - internal_net
 
+  telegram-bot:
+    build:
+      context: apps/telegram-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ALLOWED_USER_IDS=${ALLOWED_USER_IDS:-}
+      - MARKCARDS_API_URL=http://server:3000
+    restart: unless-stopped
+    depends_on:
+      - server
+    networks:
+      - internal_net
+
 volumes:
   markcards_data:
   tailscale_state:
