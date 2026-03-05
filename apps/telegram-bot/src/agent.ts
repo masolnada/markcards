@@ -1,4 +1,4 @@
-import { createGeminiProvider } from "ai-sdk-provider-gemini-cli";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 
 interface AgentInput {
@@ -6,7 +6,7 @@ interface AgentInput {
   imageBuffer?: ArrayBuffer;
 }
 
-const gemini = createGeminiProvider({ authType: "apiKey", apiKey: process.env.GOOGLE_GEMINI_API_KEY });
+const gemini = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
 export async function runAgent({
   text,

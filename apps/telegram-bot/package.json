@@ -7,8 +7,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
     "ai": "^4.0.0",
-    "ai-sdk-provider-gemini-cli": "^0.1.4",
     "grammy": "^1.30.0"
   },
   "devDependencies": {
