@@ -27,7 +27,7 @@ services:
 
   caddy:
     build: ./.deploy/gateway
-    container_name: markcards-caddy
+    container_name: markcards-gateway
     restart: unless-stopped
     network_mode: service:tailscale
     depends_on:
