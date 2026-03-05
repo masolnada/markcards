@@ -38,43 +38,29 @@ function parseJson(raw: string): CardGenerationResult {
   return JSON.parse(cleaned) as CardGenerationResult;
 }
 
-export async function generateCards(
+export async function startImageChat(
   imageBuffer: ArrayBuffer,
   caption: string | undefined,
-  history: ConversationMessage[],
-): Promise<{ result: CardGenerationResult; updatedHistory: ConversationMessage[] }> {
+): Promise<{ reply: string; history: ConversationMessage[] }> {
   const userContent: CoreMessage['content'] = [
     { type: 'image', image: new Uint8Array(imageBuffer), mimeType: 'image/jpeg' },
-    { type: 'text', text: caption ?? 'Generate flashcards from this image.' },
+    { type: 'text', text: caption ?? 'What do you see?' },
   ];
 
-  const messages: ConversationMessage[] = [
-    ...history,
-    { role: 'user', content: userContent },
-  ];
+  const messages: ConversationMessage[] = [{ role: 'user', content: userContent }];
 
-  const { text } = await generateText({
-    model: google(MODEL),
-    system: CARD_SYSTEM_PROMPT,
-    messages,
-  });
+  const { text: reply } = await generateText({ model: google(MODEL), messages });
 
-  const result = parseJson(text);
-  const updatedHistory: ConversationMessage[] = [
-    ...messages,
-    { role: 'assistant', content: text },
-  ];
-
-  return { result, updatedHistory };
+  const history: ConversationMessage[] = [...messages, { role: 'assistant', content: reply }];
+  return { reply, history };
 }
 
-export async function generateCardCorrection(
-  correction: string,
+export async function generateCards(
   history: ConversationMessage[],
 ): Promise<{ result: CardGenerationResult; updatedHistory: ConversationMessage[] }> {
   const messages: ConversationMessage[] = [
     ...history,
-    { role: 'user', content: correction },
+    { role: 'user', content: 'Generate flashcards from our conversation now.' },
   ];
 
   const { text } = await generateText({
@@ -84,13 +70,10 @@ export async function generateCardCorrection(
   });
 
   const result = parseJson(text);
-  const updatedHistory: ConversationMessage[] = [
-    ...messages,
-    { role: 'assistant', content: text },
-  ];
-
+  const updatedHistory: ConversationMessage[] = [...messages, { role: 'assistant', content: text }];
   return { result, updatedHistory };
 }
+
 
 export async function chat(
   text: string,
