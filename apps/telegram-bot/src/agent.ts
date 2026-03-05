@@ -1,10 +1,6 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, type CoreMessage } from 'ai';
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GEMINI_API_KEY,
-});
-
 export interface CardGenerationResult {
   cards: string;
   filePath: string;
@@ -12,6 +8,10 @@ export interface CardGenerationResult {
 }
 
 export type ConversationMessage = CoreMessage;
+
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GEMINI_API_KEY,
+});
 
 const MODEL = 'gemini-3.1-pro-preview';
 
@@ -21,7 +21,7 @@ Output ONLY valid JSON (no markdown fences) with this structure:
 {
   "filePath": "subject/topic.md",  // e.g. "physics/electrostatics.md" — always in English
   "deckName": "Topic Name",        // e.g. "Electrostatics" — always in English
-  "cards": "---\n\nQ: ...\n\nA: ...\n\n---\n\nQ: ...\n\nA: ..."
+  "cards": "---\\n\\nQ: ...\\n\\nA: ...\\n\\n---\\n\\nQ: ...\\n\\nA: ..."
 }
 
 Rules:
@@ -33,66 +33,27 @@ Rules:
 - filePath must be lowercase, use slashes for hierarchy, end in .md.`;
 
 function parseJson(raw: string): CardGenerationResult {
-  // Strip ```json fences if present
   const cleaned = raw.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
   return JSON.parse(cleaned) as CardGenerationResult;
 }
 
-export async function startImageChat(
+export async function generateCards(
   imageBuffer: ArrayBuffer,
   caption: string | undefined,
-): Promise<{ reply: string; history: ConversationMessage[] }> {
-  const userContent: CoreMessage['content'] = [
-    { type: 'image', image: new Uint8Array(imageBuffer), mimeType: 'image/jpeg' },
-    { type: 'text', text: caption ?? 'What do you see?' },
-  ];
-
-  const messages: ConversationMessage[] = [{ role: 'user', content: userContent }];
-
-  const { text: reply } = await generateText({ model: google(MODEL), messages });
-
-  const history: ConversationMessage[] = [...messages, { role: 'assistant', content: reply }];
-  return { reply, history };
-}
-
-export async function generateCards(
-  history: ConversationMessage[],
-): Promise<{ result: CardGenerationResult; updatedHistory: ConversationMessage[] }> {
-  const messages: ConversationMessage[] = [
-    ...history,
-    { role: 'user', content: 'Generate flashcards from our conversation now.' },
-  ];
-
+): Promise<CardGenerationResult> {
   const { text } = await generateText({
     model: google(MODEL),
     system: CARD_SYSTEM_PROMPT,
-    messages,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', image: new Uint8Array(imageBuffer), mimeType: 'image/jpeg' },
+          { type: 'text', text: caption ?? 'Generate flashcards from this image.' },
+        ],
+      },
+    ],
   });
 
-  const result = parseJson(text);
-  const updatedHistory: ConversationMessage[] = [...messages, { role: 'assistant', content: text }];
-  return { result, updatedHistory };
-}
-
-
-export async function chat(
-  text: string,
-  history: ConversationMessage[],
-): Promise<{ reply: string; updatedHistory: ConversationMessage[] }> {
-  const messages: ConversationMessage[] = [
-    ...history,
-    { role: 'user', content: text },
-  ];
-
-  const { text: reply } = await generateText({
-    model: google(MODEL),
-    messages,
-  });
-
-  const updatedHistory: ConversationMessage[] = [
-    ...messages,
-    { role: 'assistant', content: reply },
-  ];
-
-  return { reply, updatedHistory };
+  return parseJson(text);
 }
