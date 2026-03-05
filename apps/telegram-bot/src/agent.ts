@@ -1,5 +1,9 @@
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, type CoreMessage } from 'ai';
+
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GEMINI_API_KEY,
+});
 
 export interface CardGenerationResult {
   cards: string;
