@@ -22,9 +22,10 @@ install_docker() {
   curl -fsSL https://get.docker.com | sh
 
   echo "==> Adding users to docker group..."
-  sudo usermod -aG docker "$USER"
+  CURRENT_USER=$(whoami)
+  sudo usermod -aG docker "$CURRENT_USER"
   NORMAL_USER=$(getent passwd 1000 | cut -d: -f1)
-  if [ -n "$NORMAL_USER" ] && [ "$NORMAL_USER" != "$USER" ]; then
+  if [ -n "$NORMAL_USER" ] && [ "$NORMAL_USER" != "$CURRENT_USER" ]; then
     sudo usermod -aG docker "$NORMAL_USER"
   fi
 
@@ -34,36 +35,12 @@ install_docker() {
   echo "==> Docker installed: $(docker --version)"
 }
 
-# ── Tailscale ─────────────────────────────────────────────────────────
-install_tailscale() {
-  if command -v tailscale &>/dev/null; then
-    echo "==> Tailscale already installed: $(tailscale version | head -1)"
-    return
-  fi
-
-  echo "==> Installing Tailscale..."
-  curl -fsSL https://tailscale.com/install.sh | sh
-
-  echo "==> Enabling Tailscale service..."
-  sudo systemctl enable --now tailscaled
-
-  if [ -n "${TAILSCALE_AUTHKEY:-}" ]; then
-    echo "==> Joining Tailnet..."
-    sudo tailscale up --authkey "$TAILSCALE_AUTHKEY" --accept-routes
-  else
-    echo "    ⚠️  TAILSCALE_AUTHKEY not set — skipping tailscale up"
-  fi
-
-  echo "==> Tailscale installed."
-}
-
 # ── Main ──────────────────────────────────────────────────────────────
 echo "Markcards dependency installer"
 echo "==============================="
 echo ""
 
 install_docker
-install_tailscale
 
 echo ""
 echo "Installation complete!"

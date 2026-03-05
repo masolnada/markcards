@@ -116,7 +116,7 @@ runcmd:
   - chown -R $VM_USER:$VM_USER /opt/markcards $DECKS_DIR
   - chmod +x /opt/markcards/.deploy/install.sh /opt/markcards/.deploy/start.sh
   - /opt/markcards/.deploy/install.sh
-  - /opt/markcards/.deploy/start.sh
+#   - /opt/markcards/.deploy/start.sh
 EOF
 
 qm set "$VMID" --cicustom "vendor=local:snippets/markcards-cloud-init.yml"
