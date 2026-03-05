@@ -21,7 +21,7 @@ export async function runAgent({
   contents.push({ text: text || (imageBuffer ? "Describe what you see in this image." : "") });
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro",
+    model: "gemini-3.1-pro-preview",
     contents,
   });
 
