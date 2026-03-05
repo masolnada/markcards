@@ -63,6 +63,37 @@ Open `http://localhost:3000`.
 
 ---
 
+### Self-hosted on a VM
+
+The `.deploy/` scripts handle provisioning and deployment.
+
+**First time — provision the VM (run on the Proxmox host):**
+
+```bash
+SSH_PUB_KEY="$(cat ~/.ssh/id_infra_v2.pub)" bash .deploy/create-vm.sh
+```
+
+This creates an Ubuntu 24.04 VM, installs Docker, and clones the repo to `/opt/markcards` via cloud-init.
+
+**First time — configure and start (SSH into the VM):**
+
+```bash
+ssh -i ~/.ssh/id_infra_v2 ubuntu@markcards.local
+# edit credentials
+nano /opt/markcards/.env
+# start
+/opt/markcards/.deploy/start.sh
+```
+
+**Deploy updates (from your local machine):**
+
+```bash
+ssh -i ~/.ssh/id_infra_v2 ubuntu@markcards.local \
+  "cd /opt/markcards && git pull && .deploy/start.sh"
+```
+
+---
+
 ## Configuration
 
 All configuration is via environment variables. Copy `.env.example` to `.env` and edit as needed.
