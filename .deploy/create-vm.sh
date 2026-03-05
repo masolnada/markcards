@@ -29,6 +29,7 @@ echo "==> Creating VM $VMID ($VM_NAME)..."
 qm create "$VMID" \
   --name "$VM_NAME" \
   --ostype l26 \
+  --cpu host \
   --cores "$CORES" \
   --memory "$MEMORY" \
   --net0 "virtio,bridge=$BRIDGE,tag=$VLAN_TAG" \
