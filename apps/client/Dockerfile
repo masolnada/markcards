@@ -22,8 +22,9 @@ FROM oven/bun:1-slim AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /app/apps/client/dist ./public
-COPY --from=builder /app/apps/client/public ./public
+COPY --from=builder /app/apps/client/dist/client.js  ./public/client.js
+COPY --from=builder /app/apps/client/dist/client.css ./public/client.css
+COPY --from=builder /app/apps/client/public/index.html ./public/index.html
 COPY apps/client/serve.ts ./serve.ts
 
 EXPOSE 3001

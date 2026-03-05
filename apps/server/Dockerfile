@@ -1,11 +1,7 @@
-# Note: This Dockerfile uses Bun. If the server's CPU lacks AVX support (older
-# Proxmox CPU type), Bun's JavaScriptCore engine will segfault during builds.
-# Fix: set the Proxmox VM CPU type to "host" or a modern type with AVX.
-# Track the upstream Bun issue: https://github.com/oven-sh/bun/issues/9423
-
 FROM oven/bun:1 AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -13,34 +9,33 @@ ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
 COPY package.json bun.lock ./
-COPY apps/server/package.json ./apps/server/
 COPY apps/client/package.json ./apps/client/
+COPY apps/server/package.json ./apps/server/
 COPY apps/telegram-bot/package.json ./apps/telegram-bot/
 
 RUN bun install --frozen-lockfile
 
-COPY . .
+COPY apps/server ./apps/server
+
 RUN cd apps/server && bun run build
-RUN bun install --frozen-lockfile --production
 
+# ── runtime ──────────────────────────────────────────────────────────────────
 FROM oven/bun:1-slim AS runtime
-
-RUN groupadd --gid 1001 markcards \
-    && useradd --uid 1001 --gid markcards --shell /bin/sh --create-home markcards
 
 WORKDIR /app
 
-COPY --from=builder --chown=markcards:markcards /app/node_modules             ./node_modules
-COPY --from=builder --chown=markcards:markcards /app/apps/server/node_modules ./apps/server/node_modules
-COPY --from=builder --chown=markcards:markcards /app/apps/server/dist         ./apps/server/dist
+COPY package.json bun.lock ./
+COPY apps/client/package.json ./apps/client/
+COPY apps/server/package.json ./apps/server/
+COPY apps/telegram-bot/package.json ./apps/telegram-bot/
 
-RUN mkdir -p /data /decks && chown markcards:markcards /data /decks
-VOLUME ["/data", "/decks"]
+RUN bun install --production --frozen-lockfile
+
+COPY --from=builder /app/apps/server/dist/server.mjs ./apps/server/dist/server.mjs
 
 ENV DB_PATH=/data/markcards.db \
     DECKS_DIR=/decks \
     PORT=3000
 
 EXPOSE 3000
-USER markcards
 CMD ["bun", "apps/server/dist/server.mjs"]
