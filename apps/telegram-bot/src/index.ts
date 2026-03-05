@@ -53,19 +53,27 @@ function approveDiscardKeyboard() {
 }
 
 async function sendGeneratedCards(chatId: number, userId: number, imageBuffer: ArrayBuffer, caption: string | undefined, placeholder: { message_id: number }) {
-  const { filePath: relPath, deckName } = await classifyImage(imageBuffer, caption);
-  const filePath = `${githubBasePath}/${relPath}`;
-  const existingCards = await getFileContent(githubOwner, githubRepo, filePath, githubToken).catch(() => null);
-  const result = await generateCards(imageBuffer, caption, existingCards);
-  result.filePath = relPath;
-  result.deckName = deckName;
+  const classified = await classifyImage(imageBuffer, caption);
+
+  const topics = await Promise.all(
+    classified.map(async ({ filePath: relPath, deckName }) => {
+      const filePath = `${githubBasePath}/${relPath}`;
+      const existingCards = await getFileContent(githubOwner, githubRepo, filePath, githubToken).catch(() => null);
+      return { filePath: relPath, deckName, existingCards };
+    }),
+  );
+
+  const groups = await generateCards(imageBuffer, caption, topics);
 
   await bot.api.deleteMessage(chatId, placeholder.message_id);
-  await bot.api.sendMessage(chatId, `📁 \`${filePath}\``, { parse_mode: 'Markdown' });
 
-  for (const card of splitCards(result.cards)) {
-    const msg = await bot.api.sendMessage(chatId, card, { reply_markup: approveDiscardKeyboard() });
-    cardStates.set(msg.message_id, { card, filePath, deckName: result.deckName, userId });
+  for (const group of groups) {
+    const filePath = `${githubBasePath}/${group.filePath}`;
+    await bot.api.sendMessage(chatId, `📁 \`${filePath}\``, { parse_mode: 'Markdown' });
+    for (const card of splitCards(group.cards)) {
+      const msg = await bot.api.sendMessage(chatId, card, { reply_markup: approveDiscardKeyboard() });
+      cardStates.set(msg.message_id, { card, filePath, deckName: group.deckName, userId });
+    }
   }
 }
 
