@@ -26,7 +26,7 @@ services:
       retries: 6
 
   caddy:
-    build: ./gateway
+    build: ./.deploy/gateway
     container_name: markcards-caddy
     restart: unless-stopped
     network_mode: service:tailscale
@@ -39,7 +39,7 @@ services:
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
       - CADDY_ADMIN=:2019
     volumes:
-      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./.deploy/gateway/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
 
