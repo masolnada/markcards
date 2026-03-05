@@ -1,10 +1,12 @@
-import { anthropic } from "@ai-sdk/anthropic";
+import { createGeminiProvider } from "ai-sdk-provider-gemini-cli";
 import { generateText } from "ai";
 
 interface AgentInput {
   text?: string;
   imageBuffer?: ArrayBuffer;
 }
+
+const gemini = createGeminiProvider({ authType: "apiKey", apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
 export async function runAgent({
   text,
@@ -19,7 +21,7 @@ export async function runAgent({
   ];
 
   const { text: result } = await generateText({
-    model: anthropic("claude-sonnet-4-6"),
+    model: gemini("gemini-3-flash-preview"),
     messages: [{ role: "user", content }],
   });
 

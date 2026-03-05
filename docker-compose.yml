@@ -75,6 +75,7 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
       - ALLOWED_USER_IDS=${ALLOWED_USER_IDS:-}
       - MARKCARDS_API_URL=http://server:3000
     restart: unless-stopped

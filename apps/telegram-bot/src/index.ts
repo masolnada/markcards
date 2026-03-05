@@ -6,7 +6,7 @@ const allowedUsers =
   process.env.ALLOWED_USER_IDS?.split(",").map(Number).filter(Boolean) ?? [];
 
 if (!token) throw new Error("TELEGRAM_BOT_TOKEN is required");
-if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is required");
+if (!process.env.GOOGLE_GEMINI_API_KEY) throw new Error("GOOGLE_GEMINI_API_KEY is required");
 
 if (allowedUsers.length === 0) {
   console.warn("Warning: ALLOWED_USER_IDS is not set — bot is open to everyone");
