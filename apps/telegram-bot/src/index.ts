@@ -20,6 +20,14 @@ if (allowedUsers.length === 0) {
   console.warn('Warning: ALLOWED_USER_IDS is not set — bot is open to everyone');
 }
 
+const TG_MAX = 4096;
+
+async function sendLong(chatId: number, text: string): Promise<void> {
+  for (let i = 0; i < text.length; i += TG_MAX) {
+    await bot.api.sendMessage(chatId, text.slice(i, i + TG_MAX));
+  }
+}
+
 // --- State ---
 
 interface ChatSession {
@@ -72,7 +80,8 @@ bot.on('message:photo', async (ctx) => {
   try {
     const { reply, history } = await startImageChat(imageBuffer, ctx.message.caption);
     chatSessions.set(userId, { history });
-    await ctx.api.editMessageText(chatId, placeholder.message_id, reply);
+    await ctx.api.deleteMessage(chatId, placeholder.message_id);
+    await sendLong(chatId, reply);
   } catch (err) {
     console.error(err);
     await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong.');
@@ -82,12 +91,13 @@ bot.on('message:photo', async (ctx) => {
 bot.on('message:text', async (ctx) => {
   if (!isAuthorized(ctx.from.id)) return;
   const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
   const session = chatSessions.get(userId);
 
   try {
     const { reply, updatedHistory } = await chat(ctx.message.text, session?.history ?? []);
     chatSessions.set(userId, { history: updatedHistory });
-    await ctx.reply(reply);
+    await sendLong(chatId, reply);
   } catch (err) {
     console.error(err);
     await ctx.reply('Something went wrong.');
