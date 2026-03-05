@@ -19,6 +19,12 @@ if (allowedUsers.length === 0) {
   console.warn('Warning: ALLOWED_USER_IDS is not set — bot is open to everyone');
 }
 
+interface LastImage {
+  imageBuffer: ArrayBuffer;
+  caption: string | undefined;
+}
+const lastImages = new Map<number, LastImage>(); // key: userId
+
 interface CardState {
   card: string;
   filePath: string;
@@ -46,6 +52,19 @@ function approveDiscardKeyboard() {
   return new InlineKeyboard().text('✅ Approve', 'approve').text('❌ Discard', 'discard');
 }
 
+async function sendGeneratedCards(chatId: number, userId: number, imageBuffer: ArrayBuffer, caption: string | undefined, placeholder: { message_id: number }) {
+  const result = await generateCards(imageBuffer, caption);
+  const filePath = `${githubBasePath}/${result.filePath}`;
+
+  await bot.api.deleteMessage(chatId, placeholder.message_id);
+  await bot.api.sendMessage(chatId, `📁 \`${filePath}\``, { parse_mode: 'Markdown' });
+
+  for (const card of splitCards(result.cards)) {
+    const msg = await bot.api.sendMessage(chatId, card, { reply_markup: approveDiscardKeyboard() });
+    cardStates.set(msg.message_id, { card, filePath, deckName: result.deckName, userId });
+  }
+}
+
 const bot = new Bot(token);
 
 bot.on('message:photo', async (ctx) => {
@@ -58,18 +77,31 @@ bot.on('message:photo', async (ctx) => {
   const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
   const imageBuffer = await fetch(fileUrl).then((r) => r.arrayBuffer());
 
+  lastImages.set(userId, { imageBuffer, caption: ctx.message.caption });
+
   const placeholder = await ctx.reply('Generating cards...');
   try {
-    const result = await generateCards(imageBuffer, ctx.message.caption);
-    const filePath = `${githubBasePath}/${result.filePath}`;
+    await sendGeneratedCards(chatId, userId, imageBuffer, ctx.message.caption, placeholder);
+  } catch (err) {
+    console.error(err);
+    await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
+  }
+});
 
-    await ctx.api.deleteMessage(chatId, placeholder.message_id);
-    await ctx.reply(`📁 \`${filePath}\``, { parse_mode: 'Markdown' });
+bot.command('more', async (ctx) => {
+  if (!isAuthorized(ctx.from!.id)) return;
+  const userId = ctx.from!.id;
+  const chatId = ctx.chat.id;
 
-    for (const card of splitCards(result.cards)) {
-      const msg = await bot.api.sendMessage(chatId, card, { reply_markup: approveDiscardKeyboard() });
-      cardStates.set(msg.message_id, { card, filePath, deckName: result.deckName, userId });
-    }
+  const last = lastImages.get(userId);
+  if (!last) {
+    await ctx.reply('No previous image. Send a photo first.');
+    return;
+  }
+
+  const placeholder = await ctx.reply('Generating more cards...');
+  try {
+    await sendGeneratedCards(chatId, userId, last.imageBuffer, last.caption, placeholder);
   } catch (err) {
     console.error(err);
     await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
