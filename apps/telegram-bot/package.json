@@ -8,8 +8,8 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.43",
-    "ai": "^4.0.0",
-    "grammy": "^1.30.0"
+    "ai": "^6.0.116",
+    "grammy": "^1.41.1"
   },
   "devDependencies": {
     "bun-types": "latest",
