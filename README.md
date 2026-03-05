@@ -70,20 +70,15 @@ The `.deploy/` scripts handle provisioning and deployment.
 **First time — provision the VM (run on the Proxmox host):**
 
 ```bash
-SSH_PUB_KEY="$(cat ~/.ssh/id_infra_v2.pub)" bash .deploy/create-vm.sh
+SSH_PUB_KEY="$(cat ~/.ssh/id_infra_v2.pub)" \
+  DOMAIN=example.com \
+  ACME_EMAIL=you@example.com \
+  CLOUDFLARE_API_TOKEN=... \
+  TAILSCALE_AUTHKEY=... \
+  bash .deploy/create-vm.sh
 ```
 
-This creates an Ubuntu 24.04 VM, installs Docker, and clones the repo to `/opt/markcards` via cloud-init.
-
-**First time — configure and start (SSH into the VM):**
-
-```bash
-ssh -i ~/.ssh/id_infra_v2 ubuntu@markcards.local
-# edit credentials
-nano /opt/markcards/.env
-# start
-/opt/markcards/.deploy/start.sh
-```
+This creates an Ubuntu 24.04 VM and via cloud-init: installs Docker, clones the repo, writes `.env`, and starts the app — no manual SSH needed.
 
 **Deploy updates (from your local machine):**
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ── Configuration ─────────────────────────────────────────────────────
+# ── VM Configuration ───────────────────────────────────────────────────
 VMID=${VMID:-300}
 VM_NAME=${VM_NAME:-markcards}
 CORES=${CORES:-2}
@@ -15,6 +15,32 @@ VM_USER=${VM_USER:-ubuntu}
 CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
 CLOUD_IMAGE="/var/lib/vz/template/iso/ubuntu-24.04-cloudimg-amd64.img"
 REPO_URL=${REPO_URL:-https://github.com/masolnada/markcards.git}
+
+# ── App Configuration (.env) ───────────────────────────────────────────
+DOMAIN=${DOMAIN:-}
+ACME_EMAIL=${ACME_EMAIL:-}
+CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+TAILSCALE_AUTHKEY=${TAILSCALE_AUTHKEY:-}
+GITHUB_REPO=${GITHUB_REPO:-}
+GITHUB_TOKEN=${GITHUB_TOKEN:-}
+DECKS_DIR=${DECKS_DIR:-/decks}
+
+# ── Validate required vars ─────────────────────────────────────────────
+if [ -z "$SSH_PUB_KEY" ]; then
+  echo "    ⚠️  No SSH_PUB_KEY provided — VM will not be accessible"
+  echo "    Usage: SSH_PUB_KEY=\"\$(cat ~/.ssh/id_infra_v2.pub)\" bash create-vm.sh"
+  exit 1
+fi
+
+missing=()
+[ -z "$DOMAIN" ]                && missing+=("DOMAIN")
+[ -z "$ACME_EMAIL" ]            && missing+=("ACME_EMAIL")
+[ -z "$CLOUDFLARE_API_TOKEN" ]  && missing+=("CLOUDFLARE_API_TOKEN")
+[ -z "$TAILSCALE_AUTHKEY" ]     && missing+=("TAILSCALE_AUTHKEY")
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "⚠️  Missing required env vars: ${missing[*]}"
+  exit 1
+fi
 
 # ── Download cloud image ──────────────────────────────────────────────
 if [ ! -f "$CLOUD_IMAGE" ]; then
@@ -51,17 +77,11 @@ qm set "$VMID" --ipconfig0 ip=dhcp
 qm set "$VMID" --ciuser "$VM_USER"
 
 # ── SSH key setup ─────────────────────────────────────────────────────
-if [ -n "$SSH_PUB_KEY" ]; then
-  SSH_KEY_FILE=$(mktemp)
-  echo "$SSH_PUB_KEY" > "$SSH_KEY_FILE"
-  qm set "$VMID" --sshkeys "$SSH_KEY_FILE"
-  rm -f "$SSH_KEY_FILE"
-  echo "    SSH key loaded from SSH_PUB_KEY"
-else
-  echo "    ⚠️  No SSH_PUB_KEY provided — VM will not be accessible"
-  echo "    Usage: SSH_PUB_KEY=\"\$(cat ~/.ssh/id_rsa.pub)\" bash create-vm.sh"
-  exit 1
-fi
+SSH_KEY_FILE=$(mktemp)
+echo "$SSH_PUB_KEY" > "$SSH_KEY_FILE"
+qm set "$VMID" --sshkeys "$SSH_KEY_FILE"
+rm -f "$SSH_KEY_FILE"
+echo "    SSH key loaded from SSH_PUB_KEY"
 
 # ── Cloud-init user data (post-boot provisioning) ─────────────────────
 SNIPPET_DIR="/var/lib/vz/snippets"
@@ -76,12 +96,27 @@ packages:
   - git
   - jq
 
+write_files:
+  - path: /opt/markcards/.env
+    permissions: '0600'
+    content: |
+      DOMAIN=$DOMAIN
+      ACME_EMAIL=$ACME_EMAIL
+      CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN
+      TAILSCALE_AUTHKEY=$TAILSCALE_AUTHKEY
+      GITHUB_REPO=$GITHUB_REPO
+      GITHUB_TOKEN=$GITHUB_TOKEN
+      DECKS_DIR=$DECKS_DIR
+
 runcmd:
-  - git clone $REPO_URL /opt/markcards
+  - git clone $REPO_URL /opt/markcards-repo
+  - cp /opt/markcards/.env /opt/markcards-repo/.env
+  - rm -rf /opt/markcards
+  - mv /opt/markcards-repo /opt/markcards
   - chown -R $VM_USER:$VM_USER /opt/markcards
-  - chmod +x /opt/markcards/.deploy/install.sh /opt/markcards/.deploy/init.sh
+  - chmod +x /opt/markcards/.deploy/install.sh /opt/markcards/.deploy/start.sh
   - /opt/markcards/.deploy/install.sh
-  - /opt/markcards/.deploy/init.sh
+  - /opt/markcards/.deploy/start.sh
 EOF
 
 qm set "$VMID" --cicustom "vendor=local:snippets/markcards-cloud-init.yml"
@@ -99,12 +134,9 @@ echo "  Host:     $VM_NAME.local"
 echo "  Auth:     SSH key only (password disabled)"
 echo ""
 echo "Cloud-init will automatically:"
-echo "  1. Install git and jq"
-echo "  2. Clone the markcards repo to /opt/markcards"
-echo "  3. Run .deploy/install.sh (Docker)"
-echo "  4. Run .deploy/init.sh (.env setup)"
+echo "  1. Install git, jq and Docker"
+echo "  2. Clone the repo to /opt/markcards"
+echo "  3. Write .env with provided credentials"
+echo "  4. Run .deploy/start.sh"
 echo ""
-echo "Next steps after VM boots:"
-echo "  1. SSH into the VM: ssh $VM_USER@$VM_NAME.local"
-echo "  2. Edit /opt/markcards/.env with your credentials"
-echo "  3. Start: /opt/markcards/.deploy/start.sh"
+echo "Monitor progress: ssh $VM_USER@$VM_NAME.local 'sudo cloud-init status --wait'"
