@@ -78,6 +78,9 @@ services:
       - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
       - ALLOWED_USER_IDS=${ALLOWED_USER_IDS:-}
       - MARKCARDS_API_URL=http://server:3000
+      - GITHUB_REPO=${GITHUB_REPO}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_PATH=${GITHUB_PATH:-cards}
     restart: unless-stopped
     depends_on:
       - server
