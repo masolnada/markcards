@@ -14,7 +14,6 @@ export async function appendOrCreateFile(
   filePath: string,
   token: string,
   cardsMarkdown: string,
-  deckName: string,
 ): Promise<{ url: string; created: boolean }> {
   const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath}`;
 
@@ -29,7 +28,7 @@ export async function appendOrCreateFile(
   let created: boolean;
 
   if (getRes.status === 404) {
-    content = `---\nname = "${deckName}"\n---\n\n${cardsMarkdown}`;
+    content = cardsMarkdown;
     created = true;
   } else {
     const existing = (await getRes.json()) as { content: string; sha: string };

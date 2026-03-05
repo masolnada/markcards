@@ -212,7 +212,7 @@ bot.command('push', async (ctx) => {
   for (const [filePath, { cards, deckName }] of byFile) {
     try {
       const cardsMarkdown = cards.join('\n\n---\n\n');
-      const { url, created } = await appendOrCreateFile(githubOwner, githubRepo, filePath, githubToken, cardsMarkdown, deckName);
+      const { url, created } = await appendOrCreateFile(githubOwner, githubRepo, filePath, githubToken, cardsMarkdown);
       const verb = created ? 'Created' : 'Appended to';
       lines.push(`${verb} \`${filePath}\` (+${cards.length})\n${url}`);
     } catch (err) {
