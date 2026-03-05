@@ -21,28 +21,59 @@ if (allowedUsers.length === 0) {
 }
 
 // --- State ---
-interface PendingState {
-  cards: string;
+
+// Per card-message state (keyed by the bot message_id that has the buttons)
+interface CardState {
+  card: string;
   filePath: string;
   deckName: string;
-  imageBuffer: ArrayBuffer;
-  history: ConversationMessage[];
-  promptMessageId: number;
+  userId: number;
 }
-const pendingStates = new Map<number, PendingState>();
+const cardStates = new Map<number, CardState>(); // key: messageId
+
+// Per user session (for corrections)
+interface UserSession {
+  history: ConversationMessage[];
+  imageBuffer: ArrayBuffer;
+  filePath: string;
+  deckName: string;
+  pendingMessageIds: number[];
+}
+const userSessions = new Map<number, UserSession>(); // key: userId
 
 // --- Helpers ---
 function isAuthorized(userId: number): boolean {
   return allowedUsers.length === 0 || allowedUsers.includes(userId);
 }
 
-function buildCardsMessage(cards: string, filePath: string): string {
-  return `📁 \`${filePath}\`\n\n${cards}`;
+function splitCards(cards: string): string[] {
+  return cards.split(/\n---\n/).map((c) => c.trim()).filter(Boolean);
 }
 
-const pushDiscardKeyboard = new InlineKeyboard()
-  .text('✅ Push', 'push')
-  .text('❌ Discard', 'discard');
+function cardKeyboard() {
+  return new InlineKeyboard().text('✅ Push', 'push').text('❌ Discard', 'discard');
+}
+
+async function sendCardMessages(
+  bot: Bot,
+  chatId: number,
+  userId: number,
+  cards: string[],
+  filePath: string,
+  deckName: string,
+  history: ConversationMessage[],
+  imageBuffer: ArrayBuffer,
+): Promise<void> {
+  const messageIds: number[] = [];
+
+  for (const card of cards) {
+    const msg = await bot.api.sendMessage(chatId, card, { reply_markup: cardKeyboard() });
+    cardStates.set(msg.message_id, { card, filePath, deckName, userId });
+    messageIds.push(msg.message_id);
+  }
+
+  userSessions.set(userId, { history, imageBuffer, filePath, deckName, pendingMessageIds: messageIds });
+}
 
 // --- Bot ---
 const bot = new Bot(token);
@@ -50,8 +81,17 @@ const bot = new Bot(token);
 bot.on('message:photo', async (ctx) => {
   if (!isAuthorized(ctx.from.id)) return;
   const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
 
-  pendingStates.delete(userId);
+  // Clear old session
+  const oldSession = userSessions.get(userId);
+  if (oldSession) {
+    for (const msgId of oldSession.pendingMessageIds) {
+      cardStates.delete(msgId);
+      await ctx.api.editMessageReplyMarkup(chatId, msgId, { reply_markup: undefined }).catch(() => {});
+    }
+    userSessions.delete(userId);
+  }
 
   const photo = ctx.message.photo.at(-1)!;
   const file = await ctx.api.getFile(photo.file_id);
@@ -64,55 +104,41 @@ bot.on('message:photo', async (ctx) => {
   try {
     const { result, updatedHistory } = await generateCards(imageBuffer, caption, []);
     const filePath = `${githubBasePath}/${result.filePath}`;
-    const text = buildCardsMessage(result.cards, filePath);
+    await ctx.api.deleteMessage(chatId, placeholder.message_id);
 
-    await ctx.api.editMessageText(ctx.chat.id, placeholder.message_id, text, {
-      reply_markup: pushDiscardKeyboard,
-      parse_mode: 'Markdown',
-    });
-
-    pendingStates.set(userId, {
-      cards: result.cards,
-      filePath,
-      deckName: result.deckName,
-      imageBuffer,
-      history: updatedHistory,
-      promptMessageId: placeholder.message_id,
-    });
+    await ctx.reply(`📁 \`${filePath}\``, { parse_mode: 'Markdown' });
+    await sendCardMessages(bot, chatId, userId, splitCards(result.cards), filePath, result.deckName, updatedHistory, imageBuffer);
   } catch (err) {
     console.error(err);
-    await ctx.api.editMessageText(ctx.chat.id, placeholder.message_id, 'Something went wrong analyzing the image.');
+    await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong analyzing the image.');
   }
 });
 
 bot.on('message:text', async (ctx) => {
   if (!isAuthorized(ctx.from.id)) return;
   const userId = ctx.from.id;
-  const pending = pendingStates.get(userId);
+  const chatId = ctx.chat.id;
+  const session = userSessions.get(userId);
 
-  if (pending) {
+  if (session) {
     const ephemeral = await ctx.reply('Regenerating...');
     try {
-      const { result, updatedHistory } = await generateCardCorrection(ctx.message.text, pending.history);
+      const { result, updatedHistory } = await generateCardCorrection(ctx.message.text, session.history);
       const filePath = `${githubBasePath}/${result.filePath}`;
-      const text = buildCardsMessage(result.cards, filePath);
 
-      await ctx.api.editMessageText(ctx.chat.id, pending.promptMessageId, text, {
-        reply_markup: pushDiscardKeyboard,
-        parse_mode: 'Markdown',
-      });
-      await ctx.api.deleteMessage(ctx.chat.id, ephemeral.message_id);
+      // Remove buttons from old card messages
+      for (const msgId of session.pendingMessageIds) {
+        cardStates.delete(msgId);
+        await ctx.api.editMessageReplyMarkup(chatId, msgId, { reply_markup: undefined }).catch(() => {});
+      }
+      userSessions.delete(userId);
 
-      pendingStates.set(userId, {
-        ...pending,
-        cards: result.cards,
-        filePath,
-        deckName: result.deckName,
-        history: updatedHistory,
-      });
+      await ctx.api.deleteMessage(chatId, ephemeral.message_id);
+      await ctx.reply(`📁 \`${filePath}\``, { parse_mode: 'Markdown' });
+      await sendCardMessages(bot, chatId, userId, splitCards(result.cards), filePath, result.deckName, updatedHistory, session.imageBuffer);
     } catch (err) {
       console.error(err);
-      await ctx.api.editMessageText(ctx.chat.id, ephemeral.message_id, 'Something went wrong regenerating cards.');
+      await ctx.api.editMessageText(chatId, ephemeral.message_id, 'Something went wrong regenerating cards.');
     }
     return;
   }
@@ -129,47 +155,49 @@ bot.on('message:text', async (ctx) => {
 bot.on('callback_query:data', async (ctx) => {
   await ctx.answerCallbackQuery();
 
-  const userId = ctx.from.id;
-  const chatId = ctx.chat?.id ?? ctx.callbackQuery.message?.chat.id;
+  const chatId = ctx.callbackQuery.message?.chat.id;
   const messageId = ctx.callbackQuery.message?.message_id;
-
   if (!chatId || !messageId) return;
 
-  const pending = pendingStates.get(userId);
+  const cardState = cardStates.get(messageId);
 
-  if (!pending) {
+  if (!cardState) {
     await ctx.api.editMessageReplyMarkup(chatId, messageId, { reply_markup: undefined });
     await ctx.reply('Session expired.');
     return;
   }
 
-  // Remove inline buttons
+  // Remove buttons from this message
   await ctx.api.editMessageReplyMarkup(chatId, messageId, { reply_markup: undefined });
-  pendingStates.delete(userId);
+  cardStates.delete(messageId);
+
+  // Remove from user session tracking
+  const session = userSessions.get(cardState.userId);
+  if (session) {
+    session.pendingMessageIds = session.pendingMessageIds.filter((id) => id !== messageId);
+    if (session.pendingMessageIds.length === 0) userSessions.delete(cardState.userId);
+  }
 
   const action = ctx.callbackQuery.data;
 
-  if (action === 'discard') {
-    await ctx.reply('Cards discarded.');
-    return;
-  }
+  if (action === 'discard') return;
 
   if (action === 'push') {
-    const pushMsg = await ctx.reply('Pushing to GitHub...');
+    const pushMsg = await ctx.api.sendMessage(chatId, 'Pushing to GitHub...');
     try {
       const { url, created } = await appendOrCreateFile(
         githubOwner,
         githubRepo,
-        pending.filePath,
+        cardState.filePath,
         githubToken,
-        pending.cards,
-        pending.deckName,
+        cardState.card,
+        cardState.deckName,
       );
       const verb = created ? 'Created' : 'Appended to';
       await ctx.api.editMessageText(
         chatId,
         pushMsg.message_id,
-        `${verb} \`${pending.filePath}\`\n${url}`,
+        `${verb} \`${cardState.filePath}\`\n${url}`,
         { parse_mode: 'Markdown' },
       );
     } catch (err) {
