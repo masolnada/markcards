@@ -22,7 +22,6 @@ if (allowedUsers.length === 0) {
 
 // --- State ---
 
-// Per card-message state (keyed by the bot message_id that has the buttons)
 interface CardState {
   card: string;
   filePath: string;
@@ -31,7 +30,6 @@ interface CardState {
 }
 const cardStates = new Map<number, CardState>(); // key: messageId
 
-// Per user session (for corrections)
 interface UserSession {
   history: ConversationMessage[];
   imageBuffer: ArrayBuffer;
@@ -40,6 +38,13 @@ interface UserSession {
   pendingMessageIds: number[];
 }
 const userSessions = new Map<number, UserSession>(); // key: userId
+
+interface StagedCard {
+  card: string;
+  filePath: string;
+  deckName: string;
+}
+const stagedCards = new Map<number, StagedCard[]>(); // key: userId
 
 // --- Helpers ---
 function isAuthorized(userId: number): boolean {
@@ -50,8 +55,8 @@ function splitCards(cards: string): string[] {
   return cards.split(/\n---\n/).map((c) => c.trim()).filter(Boolean);
 }
 
-function cardKeyboard() {
-  return new InlineKeyboard().text('✅ Push', 'push').text('❌ Discard', 'discard');
+function approveDiscardKeyboard() {
+  return new InlineKeyboard().text('✅ Approve', 'approve').text('❌ Discard', 'discard');
 }
 
 async function sendCardMessages(
@@ -65,13 +70,11 @@ async function sendCardMessages(
   imageBuffer: ArrayBuffer,
 ): Promise<void> {
   const messageIds: number[] = [];
-
   for (const card of cards) {
-    const msg = await bot.api.sendMessage(chatId, card, { reply_markup: cardKeyboard() });
+    const msg = await bot.api.sendMessage(chatId, card, { reply_markup: approveDiscardKeyboard() });
     cardStates.set(msg.message_id, { card, filePath, deckName, userId });
     messageIds.push(msg.message_id);
   }
-
   userSessions.set(userId, { history, imageBuffer, filePath, deckName, pendingMessageIds: messageIds });
 }
 
@@ -83,7 +86,6 @@ bot.on('message:photo', async (ctx) => {
   const userId = ctx.from.id;
   const chatId = ctx.chat.id;
 
-  // Clear old session
   const oldSession = userSessions.get(userId);
   if (oldSession) {
     for (const msgId of oldSession.pendingMessageIds) {
@@ -105,7 +107,6 @@ bot.on('message:photo', async (ctx) => {
     const { result, updatedHistory } = await generateCards(imageBuffer, caption, []);
     const filePath = `${githubBasePath}/${result.filePath}`;
     await ctx.api.deleteMessage(chatId, placeholder.message_id);
-
     await ctx.reply(`📁 \`${filePath}\``, { parse_mode: 'Markdown' });
     await sendCardMessages(bot, chatId, userId, splitCards(result.cards), filePath, result.deckName, updatedHistory, imageBuffer);
   } catch (err) {
@@ -126,7 +127,6 @@ bot.on('message:text', async (ctx) => {
       const { result, updatedHistory } = await generateCardCorrection(ctx.message.text, session.history);
       const filePath = `${githubBasePath}/${result.filePath}`;
 
-      // Remove buttons from old card messages
       for (const msgId of session.pendingMessageIds) {
         cardStates.delete(msgId);
         await ctx.api.editMessageReplyMarkup(chatId, msgId, { reply_markup: undefined }).catch(() => {});
@@ -163,48 +163,65 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (!cardState) {
     await ctx.api.editMessageReplyMarkup(chatId, messageId, { reply_markup: undefined });
-    await ctx.reply('Session expired.');
     return;
   }
 
-  // Remove buttons from this message
   await ctx.api.editMessageReplyMarkup(chatId, messageId, { reply_markup: undefined });
   cardStates.delete(messageId);
 
-  // Remove from user session tracking
   const session = userSessions.get(cardState.userId);
   if (session) {
     session.pendingMessageIds = session.pendingMessageIds.filter((id) => id !== messageId);
     if (session.pendingMessageIds.length === 0) userSessions.delete(cardState.userId);
   }
 
-  const action = ctx.callbackQuery.data;
+  if (ctx.callbackQuery.data === 'discard') return;
 
-  if (action === 'discard') return;
+  if (ctx.callbackQuery.data === 'approve') {
+    const staged = stagedCards.get(cardState.userId) ?? [];
+    staged.push({ card: cardState.card, filePath: cardState.filePath, deckName: cardState.deckName });
+    stagedCards.set(cardState.userId, staged);
+    await ctx.api.sendMessage(chatId, `✅ Staged (${staged.length} card${staged.length === 1 ? '' : 's'} ready — /push to commit)`);
+  }
+});
 
-  if (action === 'push') {
-    const pushMsg = await ctx.api.sendMessage(chatId, 'Pushing to GitHub...');
+bot.command('push', async (ctx) => {
+  if (!isAuthorized(ctx.from!.id)) return;
+  const userId = ctx.from!.id;
+  const chatId = ctx.chat.id;
+
+  const staged = stagedCards.get(userId);
+  if (!staged || staged.length === 0) {
+    await ctx.reply('No staged cards. Approve some cards first.');
+    return;
+  }
+
+  stagedCards.delete(userId);
+
+  // Group by filePath
+  const byFile = new Map<string, { cards: string[]; deckName: string }>();
+  for (const { card, filePath, deckName } of staged) {
+    const entry = byFile.get(filePath) ?? { cards: [], deckName };
+    entry.cards.push(card);
+    byFile.set(filePath, entry);
+  }
+
+  const pushMsg = await ctx.reply(`Pushing ${staged.length} card${staged.length === 1 ? '' : 's'} to GitHub...`);
+  const lines: string[] = [];
+
+  for (const [filePath, { cards, deckName }] of byFile) {
     try {
-      const { url, created } = await appendOrCreateFile(
-        githubOwner,
-        githubRepo,
-        cardState.filePath,
-        githubToken,
-        cardState.card,
-        cardState.deckName,
-      );
+      const cardsMarkdown = cards.join('\n\n---\n\n');
+      const { url, created } = await appendOrCreateFile(githubOwner, githubRepo, filePath, githubToken, cardsMarkdown, deckName);
       const verb = created ? 'Created' : 'Appended to';
-      await ctx.api.editMessageText(
-        chatId,
-        pushMsg.message_id,
-        `${verb} \`${cardState.filePath}\`\n${url}`,
-        { parse_mode: 'Markdown' },
-      );
+      lines.push(`${verb} \`${filePath}\` (+${cards.length})\n${url}`);
     } catch (err) {
       console.error(err);
-      await ctx.api.editMessageText(chatId, pushMsg.message_id, 'Failed to push to GitHub.');
+      lines.push(`❌ Failed: \`${filePath}\``);
     }
   }
+
+  await ctx.api.editMessageText(chatId, pushMsg.message_id, lines.join('\n\n'), { parse_mode: 'Markdown' });
 });
 
 bot.start();
