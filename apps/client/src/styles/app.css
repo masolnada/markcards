@@ -24,6 +24,9 @@
 .card-content blockquote {
   @apply border-l-4 border-border pl-4 italic text-muted-foreground;
 }
+.card-content img {
+  @apply block mx-auto max-w-full;
+}
 
 /* ── Cloze card styles ─────────────────────────────────── */
 .cloze-blank {
