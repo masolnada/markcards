@@ -14,7 +14,7 @@ interface GraphNode extends SimulationNodeDatum {
   id: string;
   label: string;
   radius: number;
-  kind: 'deck' | 'folder';
+  kind: 'root' | 'deck' | 'folder';
   deckSummary?: DeckSummary;
 }
 
@@ -78,8 +78,19 @@ export function SkillsGraph({ decks }: Props) {
     const relPaths = stripCommonPrefix(rawPaths);
 
     // Build nodes and links
+    const ROOT_ID = '__root__';
     const nodeMap = new Map<string, GraphNode>();
     const links: GraphLink[] = [];
+
+    // Root node — pinned at center
+    nodeMap.set(ROOT_ID, {
+      id: ROOT_ID,
+      label: '',
+      radius: 10,
+      kind: 'root',
+      fx: width / 2,
+      fy: height / 2,
+    });
 
     // Folder nodes
     const folderSet = new Set<string>();
@@ -94,7 +105,7 @@ export function SkillsGraph({ decks }: Props) {
       nodeMap.set(folder, {
         id: folder,
         label: folder.split('/').pop() ?? folder,
-        radius: 6,
+        radius: 8,
         kind: 'folder',
       });
     }
@@ -114,10 +125,13 @@ export function SkillsGraph({ decks }: Props) {
         deckSummary: deck,
       });
 
-      // Link deck → parent folder, or folder → parent folder
       if (parts.length > 1) {
+        // Deck → its parent folder
         const parentFolder = parts.slice(0, -1).join('/');
         links.push({ source: deckId, target: parentFolder });
+      } else {
+        // Root-level deck → root
+        links.push({ source: deckId, target: ROOT_ID });
       }
     }
 
@@ -125,10 +139,14 @@ export function SkillsGraph({ decks }: Props) {
     for (const folder of folderSet) {
       const parts = folder.split('/');
       if (parts.length > 1) {
+        // Sub-folder → parent folder
         const parentFolder = parts.slice(0, -1).join('/');
         if (nodeMap.has(parentFolder)) {
           links.push({ source: folder, target: parentFolder });
         }
+      } else {
+        // Top-level folder → root
+        links.push({ source: folder, target: ROOT_ID });
       }
     }
 
@@ -163,20 +181,24 @@ export function SkillsGraph({ decks }: Props) {
       circle.setAttribute('r', String(n.radius));
       if (n.kind === 'deck' && n.deckSummary) {
         circle.setAttribute('fill', getDeckColor(n.deckSummary, svg));
+      } else if (n.kind === 'root') {
+        circle.setAttribute('fill', fgColor);
+        circle.setAttribute('opacity', '0.15');
       } else {
         circle.setAttribute('fill', mutedFg);
-        circle.setAttribute('opacity', '0.5');
+        circle.setAttribute('opacity', '0.4');
       }
-      circle.setAttribute('cursor', 'grab');
+      circle.setAttribute('cursor', n.kind === 'root' ? 'default' : 'grab');
       nodeGroup.appendChild(circle);
       return circle;
     });
 
-    // Create label elements (deck nodes only)
+    // Create label elements (deck and folder nodes)
     const labelEls: (SVGTextElement | null)[] = nodes.map(n => {
-      if (n.kind !== 'deck') return null;
+      if (n.kind === 'root' || !n.label) return null;
       const text = document.createElementNS(NS, 'text');
-      text.setAttribute('font-size', '10');
+      text.setAttribute('font-size', n.kind === 'folder' ? '11' : '10');
+      text.setAttribute('font-weight', n.kind === 'folder' ? '600' : '400');
       text.setAttribute('fill', fgColor);
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('dy', String(n.radius + 12));
@@ -225,6 +247,7 @@ export function SkillsGraph({ decks }: Props) {
 
     nodeEls.forEach((circle, i) => {
       const node = nodes[i];
+      if (node.kind === 'root') return;
       circle.addEventListener('pointerdown', (e: PointerEvent) => {
         e.preventDefault();
         dragging = node;
