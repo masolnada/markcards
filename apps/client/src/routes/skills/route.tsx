@@ -29,8 +29,14 @@ export function SkillsPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-foreground mb-6">Skills</h1>
+    <div
+      style={{
+        marginLeft: 'calc(50% - 50vw)',
+        marginRight: 'calc(50% - 50vw)',
+        marginTop: '-2rem',
+        height: 'calc(100vh - 3.5rem)',
+      }}
+    >
       <SkillsGraph decks={decks} />
     </div>
   );

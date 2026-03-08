@@ -65,7 +65,7 @@ export function SkillsGraph({ decks }: Props) {
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
     const width = svg.clientWidth || 800;
-    const height = 600;
+    const height = svg.clientHeight || 600;
 
     const NS = 'http://www.w3.org/2000/svg';
     const style = getComputedStyle(svg);
@@ -281,8 +281,7 @@ export function SkillsGraph({ decks }: Props) {
   return (
     <svg
       ref={svgRef}
-      className="w-full rounded-lg border border-border bg-surface"
-      style={{ height: '600px' }}
+      className="w-full h-full bg-surface"
     />
   );
 }
