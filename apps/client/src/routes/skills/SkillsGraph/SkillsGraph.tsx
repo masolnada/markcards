@@ -23,19 +23,12 @@ interface GraphLink extends SimulationLinkDatum<GraphNode> {
   target: string | GraphNode;
 }
 
-function getDeckColor(deck: DeckSummary, el: Element): string {
-  const style = getComputedStyle(el);
+function getDeckColorVar(deck: DeckSummary): string {
   const reviewed = deck.stats.total - deck.stats.newCards;
-  if (reviewed === 0) {
-    return style.getPropertyValue('--color-muted-foreground').trim() || '#888';
-  }
-  if (deck.stats.shortReview / reviewed > 0.5) {
-    return style.getPropertyValue('--color-danger').trim() || '#ef4444';
-  }
-  if (deck.stats.relearning / reviewed > 0.1) {
-    return style.getPropertyValue('--color-warning').trim() || '#f59e0b';
-  }
-  return style.getPropertyValue('--color-success').trim() || '#22c55e';
+  if (reviewed === 0) return 'var(--color-muted-foreground)';
+  if (deck.stats.shortReview / reviewed > 0.5) return 'var(--color-danger)';
+  if (deck.stats.relearning / reviewed > 0.1) return 'var(--color-warning)';
+  return 'var(--color-success)';
 }
 
 function stripCommonPrefix(paths: string[]): string[] {
@@ -68,10 +61,6 @@ export function SkillsGraph({ decks }: Props) {
     const height = svg.clientHeight || 600;
 
     const NS = 'http://www.w3.org/2000/svg';
-    const style = getComputedStyle(svg);
-    const borderColor = style.getPropertyValue('--color-border').trim() || '#e5e7eb';
-    const mutedFg = style.getPropertyValue('--color-muted-foreground').trim() || '#888';
-    const fgColor = style.getPropertyValue('--color-foreground').trim() || '#111';
 
     // Build relative paths
     const rawPaths = decks.map(d => d.filePath.replace(/\.md$/i, ''));
@@ -169,7 +158,7 @@ export function SkillsGraph({ decks }: Props) {
     // Create link elements
     const linkEls: SVGLineElement[] = links.map(() => {
       const line = document.createElementNS(NS, 'line');
-      line.setAttribute('stroke', borderColor);
+      line.style.stroke = 'var(--color-border)';
       line.setAttribute('stroke-width', '1');
       linkGroup.appendChild(line);
       return line;
@@ -180,12 +169,12 @@ export function SkillsGraph({ decks }: Props) {
       const circle = document.createElementNS(NS, 'circle');
       circle.setAttribute('r', String(n.radius));
       if (n.kind === 'deck' && n.deckSummary) {
-        circle.setAttribute('fill', getDeckColor(n.deckSummary, svg));
+        circle.style.fill = getDeckColorVar(n.deckSummary);
       } else if (n.kind === 'root') {
-        circle.setAttribute('fill', fgColor);
+        circle.style.fill = 'var(--color-foreground)';
         circle.setAttribute('opacity', '0.15');
       } else {
-        circle.setAttribute('fill', mutedFg);
+        circle.style.fill = 'var(--color-muted-foreground)';
         circle.setAttribute('opacity', '0.4');
       }
       circle.setAttribute('cursor', n.kind === 'root' ? 'default' : 'grab');
@@ -199,7 +188,7 @@ export function SkillsGraph({ decks }: Props) {
       const text = document.createElementNS(NS, 'text');
       text.setAttribute('font-size', n.kind === 'folder' ? '11' : '10');
       text.setAttribute('font-weight', n.kind === 'folder' ? '600' : '400');
-      text.setAttribute('fill', fgColor);
+      text.style.fill = 'var(--color-foreground)';
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('dy', String(n.radius + 12));
       text.setAttribute('pointer-events', 'none');
