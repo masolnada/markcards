@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@markcards/ui/tokens';
+@source '../../../../packages/ui/src';
 
 /* ── Card content typography ───────────────────────────── */
 .card-content p {
