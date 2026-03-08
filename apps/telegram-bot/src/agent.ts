@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText } from 'ai';
+import { generateText, type ImagePart, type TextPart } from 'ai';
 
 export interface CardGroup {
   filePath: string;
@@ -7,13 +7,17 @@ export interface CardGroup {
   cards: string;
 }
 
+export type Source =
+  | { type: 'image'; imageBuffer: ArrayBuffer; caption?: string }
+  | { type: 'text'; prompt: string };
+
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GEMINI_API_KEY,
 });
 
 const MODEL = 'gemini-3.1-pro-preview';
 
-const CLASSIFY_SYSTEM_PROMPT = `Given an image, identify all distinct subjects/topics covered. Output ONLY valid JSON array (no markdown fences):
+const CLASSIFY_SYSTEM_PROMPT = `Identify all distinct subjects/topics covered in the input. Output ONLY valid JSON array (no markdown fences):
 [
   { "filePath": "subject/area/topic.md", "deckName": "Topic Name" }
 ]
@@ -21,7 +25,7 @@ Rules:
 - Each distinct topic gets its own entry.
 - filePath and deckName must be in English. Format is always subject/area/topic.md (exactly 3 levels, lowercase).`;
 
-const CARD_SYSTEM_PROMPT = `You are a flashcard generator. Given an image and a list of topics with their existing cards, produce new atomic Q&A flashcards grouped by topic.
+const CARD_SYSTEM_PROMPT = `You are a flashcard generator. Given input and a list of topics with their existing cards, produce new atomic Q&A flashcards grouped by topic.
 
 Output ONLY valid JSON array (no markdown fences):
 [
@@ -45,29 +49,34 @@ function parseJsonArray<T>(raw: string): T[] {
   return JSON.parse(cleaned) as T[];
 }
 
-export async function classifyImage(
-  imageBuffer: ArrayBuffer,
-  caption: string | undefined,
+function sourceToContent(source: Source, extraText?: string): Array<ImagePart | TextPart> {
+  const text = [
+    source.type === 'image' ? source.caption : source.prompt,
+    extraText,
+  ].filter(Boolean).join('\n\n');
+
+  if (source.type === 'image') {
+    return [
+      { type: 'image', image: new Uint8Array(source.imageBuffer), mimeType: 'image/jpeg' },
+      { type: 'text', text: text || 'Process this image.' },
+    ];
+  }
+  return [{ type: 'text', text }];
+}
+
+export async function classify(
+  source: Source,
 ): Promise<Array<{ filePath: string; deckName: string }>> {
   const { text } = await generateText({
     model: google(MODEL),
     system: CLASSIFY_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', image: new Uint8Array(imageBuffer), mimeType: 'image/jpeg' },
-          { type: 'text', text: caption ?? 'Identify all topics in this image.' },
-        ],
-      },
-    ],
+    messages: [{ role: 'user', content: sourceToContent(source) }],
   });
   return parseJsonArray(text);
 }
 
 export async function generateCards(
-  imageBuffer: ArrayBuffer,
-  caption: string | undefined,
+  source: Source,
   topics: Array<{ filePath: string; deckName: string; existingCards: string | null }>,
 ): Promise<CardGroup[]> {
   const context = topics
@@ -81,15 +90,7 @@ export async function generateCards(
   const { text } = await generateText({
     model: google(MODEL),
     system: CARD_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', image: new Uint8Array(imageBuffer), mimeType: 'image/jpeg' },
-          { type: 'text', text: `${caption ? caption + '\n\n' : ''}Topics to generate cards for:\n${context}` },
-        ],
-      },
-    ],
+    messages: [{ role: 'user', content: sourceToContent(source, `Topics to generate cards for:\n${context}`) }],
   });
 
   return parseJsonArray<CardGroup>(text);

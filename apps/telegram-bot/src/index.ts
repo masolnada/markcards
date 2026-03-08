@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import { classifyImage, generateCards } from './agent.js';
+import { classify, generateCards, type Source } from './agent.js';
 import { getFileContent, appendOrCreateFile } from './github.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -52,8 +52,8 @@ function approveDiscardKeyboard() {
   return new InlineKeyboard().text('✅ Approve', 'approve').text('❌ Discard', 'discard');
 }
 
-async function sendGeneratedCards(chatId: number, userId: number, imageBuffer: ArrayBuffer, caption: string | undefined, placeholder: { message_id: number }) {
-  const classified = await classifyImage(imageBuffer, caption);
+async function sendGeneratedCards(chatId: number, userId: number, source: Source, placeholder: { message_id: number }) {
+  const classified = await classify(source);
 
   const topics = await Promise.all(
     classified.map(async ({ filePath: relPath, deckName }) => {
@@ -63,7 +63,7 @@ async function sendGeneratedCards(chatId: number, userId: number, imageBuffer: A
     }),
   );
 
-  const groups = await generateCards(imageBuffer, caption, topics);
+  const groups = await generateCards(source, topics);
 
   await bot.api.deleteMessage(chatId, placeholder.message_id);
 
@@ -89,11 +89,12 @@ bot.on('message:photo', async (ctx) => {
   const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
   const imageBuffer = await fetch(fileUrl).then((r) => r.arrayBuffer());
 
+  const source: Source = { type: 'image', imageBuffer, caption: ctx.message.caption };
   lastImages.set(userId, { imageBuffer, caption: ctx.message.caption });
 
   const placeholder = await ctx.reply('Generating cards...');
   try {
-    await sendGeneratedCards(chatId, userId, imageBuffer, ctx.message.caption, placeholder);
+    await sendGeneratedCards(chatId, userId, source, placeholder);
   } catch (err) {
     console.error(err);
     await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
@@ -113,7 +114,7 @@ bot.command('more', async (ctx) => {
 
   const placeholder = await ctx.reply('Generating more cards...');
   try {
-    await sendGeneratedCards(chatId, userId, last.imageBuffer, last.caption, placeholder);
+    await sendGeneratedCards(chatId, userId, { type: 'image', imageBuffer: last.imageBuffer, caption: last.caption }, placeholder);
   } catch (err) {
     console.error(err);
     await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
@@ -180,6 +181,20 @@ bot.command('push', async (ctx) => {
   }
 
   await ctx.api.editMessageText(chatId, pushMsg.message_id, lines.join('\n\n'), { parse_mode: 'Markdown' });
+});
+
+bot.on('message:text', async (ctx) => {
+  if (!isAuthorized(ctx.from.id)) return;
+  const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
+
+  const placeholder = await ctx.reply('Generating cards...');
+  try {
+    await sendGeneratedCards(chatId, userId, { type: 'text', prompt: ctx.message.text }, placeholder);
+  } catch (err) {
+    console.error(err);
+    await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
+  }
 });
 
 bot.start();
