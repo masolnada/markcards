@@ -11,7 +11,7 @@ export function ProgressBar({ value, label, className = '' }: ProgressBarProps) 
   return (
     <div className={['w-full', className].filter(Boolean).join(' ')}>
       {label !== undefined && (
-        <div className="flex justify-between mb-1.5 text-sm text-muted-foreground">
+        <div className="flex justify-between mb-1.5 px-1 text-sm text-muted-foreground">
           <span>{label}</span>
           <span>{Math.round(clamped)}%</span>
         </div>
