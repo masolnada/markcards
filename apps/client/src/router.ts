@@ -1,0 +1,44 @@
+import {
+  createRouter,
+  createRoute,
+  createRootRoute,
+  redirect,
+} from '@tanstack/react-router';
+import { RootLayout } from './routes/root/route';
+import { DecksPage } from './routes/decks/route';
+import { ReviewPage } from './routes/review/route';
+
+const rootRoute = createRootRoute({ component: RootLayout });
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  beforeLoad: () => {
+    throw redirect({ to: '/review', search: { deck: undefined } });
+  },
+});
+
+const decksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/decks',
+  component: DecksPage,
+});
+
+const reviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/review',
+  validateSearch: (search: Record<string, unknown>) => ({
+    deck: typeof search.deck === 'string' ? search.deck : undefined,
+  }),
+  component: ReviewPage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, decksRoute, reviewRoute]);
+
+export const router = createRouter({ routeTree });
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
+  }
+}

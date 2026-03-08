@@ -3,12 +3,20 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "public/**", "tailwind.config.js", "build.mjs", "tsconfig.json"],
+      "inputs": ["src/**", "public/**", "tailwind.config.ts", "build.mjs", "tsconfig.json", "vite.config.ts"],
       "outputs": ["dist/**"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "storybook": {
+      "cache": false,
+      "persistent": true
+    },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"],

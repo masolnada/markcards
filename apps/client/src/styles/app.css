@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+@import '@markcards/ui/tokens';
+
+/* ── Card content typography ───────────────────────────── */
+.card-content p {
+  @apply mb-2 last:mb-0;
+}
+.card-content ul {
+  @apply list-disc pl-5 mb-2;
+}
+.card-content ol {
+  @apply list-decimal pl-5 mb-2;
+}
+.card-content code {
+  @apply bg-surface px-1 rounded text-sm font-mono border border-border;
+}
+.card-content pre {
+  @apply bg-surface p-3 rounded overflow-x-auto mb-2 border border-border;
+}
+.card-content pre code {
+  @apply bg-transparent px-0 border-0;
+}
+.card-content blockquote {
+  @apply border-l-4 border-border pl-4 italic text-muted-foreground;
+}
+
+/* ── Cloze card styles ─────────────────────────────────── */
+.cloze-blank {
+  display: inline-block;
+  min-width: 4rem;
+  height: 1.1em;
+  background: var(--color-border);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.cloze-answer {
+  display: none;
+}
+
+.cloze-shown .cloze-blank {
+  display: none;
+}
+
+.cloze-shown .cloze-answer {
+  display: inline;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+/* ── KaTeX display math ────────────────────────────────── */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
