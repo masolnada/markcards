@@ -8,10 +8,13 @@ WORKDIR /app
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
+# Copy all workspace manifests so bun install resolves the full lockfile
 COPY package.json bun.lock ./
 COPY apps/client/package.json ./apps/client/
 COPY apps/server/package.json ./apps/server/
 COPY apps/telegram-bot/package.json ./apps/telegram-bot/
+COPY packages/types/package.json ./packages/types/
+COPY packages/ui/package.json ./packages/ui/
 
 RUN bun install --frozen-lockfile
 
@@ -28,6 +31,8 @@ COPY package.json bun.lock ./
 COPY apps/client/package.json ./apps/client/
 COPY apps/server/package.json ./apps/server/
 COPY apps/telegram-bot/package.json ./apps/telegram-bot/
+COPY packages/types/package.json ./packages/types/
+COPY packages/ui/package.json ./packages/ui/
 
 RUN bun install --production --frozen-lockfile
 
