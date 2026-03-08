@@ -1,0 +1,37 @@
+import { useQuery } from '@tanstack/react-query';
+import { Spinner } from '@markcards/ui';
+import { EmptyState } from '../../_shared/EmptyState';
+import { decksQueryOptions } from '../../api/decks';
+import { SkillsGraph } from './SkillsGraph';
+
+export function SkillsPage() {
+  const { data: decks, isLoading, error } = useQuery(decksQueryOptions);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-20">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <EmptyState title="Failed to load decks" description={error.message} />;
+  }
+
+  if (!decks?.length) {
+    return (
+      <EmptyState
+        title="No decks found"
+        description="Add .md files to your decks directory to get started."
+      />
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-foreground mb-6">Skills</h1>
+      <SkillsGraph decks={decks} />
+    </div>
+  );
+}

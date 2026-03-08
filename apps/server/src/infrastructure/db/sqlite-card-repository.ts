@@ -136,6 +136,12 @@ export class SqliteCardRepository implements CardRepository {
     const newCards = this.db.query<{ c: number }, [string]>(
       `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0`
     ).get(deckId)!.c;
-    return { total, due, newCards };
+    const relearning = this.db.query<{ c: number }, [string]>(
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 3`
+    ).get(deckId)!.c;
+    const shortReview = this.db.query<{ c: number }, [string]>(
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 2 AND scheduled_days <= 7`
+    ).get(deckId)!.c;
+    return { total, due, newCards, relearning, shortReview };
   }
 }

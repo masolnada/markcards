@@ -7,6 +7,7 @@ import {
 import { RootLayout } from './routes/root/route';
 import { DecksPage } from './routes/decks/route';
 import { ReviewPage } from './routes/review/route';
+import { SkillsPage } from './routes/skills/route';
 
 const rootRoute = createRootRoute({ component: RootLayout });
 
@@ -33,7 +34,13 @@ const reviewRoute = createRoute({
   component: ReviewPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, decksRoute, reviewRoute]);
+const skillsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/skills',
+  component: SkillsPage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, decksRoute, reviewRoute, skillsRoute]);
 
 export const router = createRouter({ routeTree });
 

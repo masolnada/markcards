@@ -61,6 +61,12 @@ export function NavBar() {
           >
             Decks
           </Link>
+          <Link
+            to="/skills"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:font-medium"
+          >
+            Skills
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">

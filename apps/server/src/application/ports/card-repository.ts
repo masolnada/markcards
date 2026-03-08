@@ -5,6 +5,8 @@ export interface DeckStats {
   total: number;
   due: number;
   newCards: number;
+  relearning: number;
+  shortReview: number;
 }
 
 export interface CardRepository {
