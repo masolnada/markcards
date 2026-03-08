@@ -3,7 +3,7 @@ import {
   forceSimulation,
   forceLink,
   forceManyBody,
-  forceCenter,
+  forceRadial,
   forceCollide,
   SimulationNodeDatum,
   SimulationLinkDatum,
@@ -14,6 +14,7 @@ interface GraphNode extends SimulationNodeDatum {
   id: string;
   label: string;
   radius: number;
+  depth: number;
   kind: 'root' | 'deck' | 'folder';
   deckSummary?: DeckSummary;
 }
@@ -76,9 +77,12 @@ export function SkillsGraph({ decks }: Props) {
       id: ROOT_ID,
       label: '',
       radius: 10,
+      depth: 0,
       kind: 'root',
       fx: width / 2,
       fy: height / 2,
+      x: width / 2,
+      y: height / 2,
     });
 
     // Folder nodes
@@ -95,6 +99,7 @@ export function SkillsGraph({ decks }: Props) {
         id: folder,
         label: folder.split('/').pop() ?? folder,
         radius: 8,
+        depth: folder.split('/').length,
         kind: 'folder',
       });
     }
@@ -110,6 +115,7 @@ export function SkillsGraph({ decks }: Props) {
         id: deckId,
         label: parts[parts.length - 1],
         radius,
+        depth: parts.length,
         kind: 'deck',
         deckSummary: deck,
       });
@@ -141,10 +147,22 @@ export function SkillsGraph({ decks }: Props) {
 
     const nodes: GraphNode[] = Array.from(nodeMap.values());
 
-    // Initialize positions randomly around center
+    const maxDepth = Math.max(...nodes.map(n => n.depth), 1);
+    const ringSpacing = Math.min(width, height) * 0.42 / maxDepth;
+
+    // Pre-position nodes on their target rings, evenly spread by angle
+    const depthCounters = new Map<number, number>();
+    const depthTotals = new Map<number, number>();
+    for (const n of nodes) depthTotals.set(n.depth, (depthTotals.get(n.depth) ?? 0) + 1);
     for (const n of nodes) {
-      n.x = width / 2 + (Math.random() - 0.5) * 200;
-      n.y = height / 2 + (Math.random() - 0.5) * 200;
+      if (n.kind === 'root') continue;
+      const count = depthTotals.get(n.depth) ?? 1;
+      const idx = depthCounters.get(n.depth) ?? 0;
+      depthCounters.set(n.depth, idx + 1);
+      const angle = (idx / count) * 2 * Math.PI;
+      const r = n.depth * ringSpacing;
+      n.x = width / 2 + r * Math.cos(angle);
+      n.y = height / 2 + r * Math.sin(angle);
     }
 
     // SVG groups
@@ -199,10 +217,10 @@ export function SkillsGraph({ decks }: Props) {
 
     // Simulation
     const sim = forceSimulation<GraphNode>(nodes)
-      .force('link', forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(60))
-      .force('charge', forceManyBody<GraphNode>().strength(-120))
-      .force('center', forceCenter(width / 2, height / 2))
-      .force('collide', forceCollide<GraphNode>(n => n.radius + 4));
+      .force('link', forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(ringSpacing * 0.9).strength(0.8))
+      .force('charge', forceManyBody<GraphNode>().strength(-300))
+      .force('radial', forceRadial<GraphNode>(n => n.depth * ringSpacing, width / 2, height / 2).strength(0.9))
+      .force('collide', forceCollide<GraphNode>(n => n.radius + 6));
 
     sim.on('tick', () => {
       for (let i = 0; i < links.length; i++) {
