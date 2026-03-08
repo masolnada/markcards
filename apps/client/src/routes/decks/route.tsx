@@ -33,7 +33,7 @@ export function DecksPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-foreground mb-6">Decks</h1>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col divide-y divide-border border border-border rounded-lg overflow-hidden">
         {decks.map((deck) => (
           <DeckCard
             key={deck.id}

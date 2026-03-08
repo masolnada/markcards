@@ -89,7 +89,7 @@ export class HtmlCardRenderer implements CardRenderer {
         deckName: deck.name,
         type: 'qa',
         promptHtml: questionHtml,
-        revealHtml: `<div class="qa-question">${questionHtml}</div><hr class="my-3 border-gray-300 dark:border-gray-600"/><div class="qa-answer">${answerHtml}</div>`,
+        revealHtml: answerHtml,
         questionHtml,
       };
     } else {

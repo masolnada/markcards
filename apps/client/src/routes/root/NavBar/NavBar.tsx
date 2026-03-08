@@ -63,13 +63,16 @@ export function NavBar() {
           </Link>
         </nav>
 
-        <button
-          onClick={toggleTheme}
-          className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-border/40 transition-colors cursor-pointer"
-          aria-label={resolvedTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-        >
-          {resolvedTheme === 'light' ? <MoonIcon /> : <SunIcon />}
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-mono">{__APP_VERSION__}</span>
+          <button
+            onClick={toggleTheme}
+            className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-border/40 transition-colors cursor-pointer"
+            aria-label={resolvedTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {resolvedTheme === 'light' ? <MoonIcon /> : <SunIcon />}
+          </button>
+        </div>
       </div>
     </header>
   );
