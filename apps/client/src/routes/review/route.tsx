@@ -123,10 +123,15 @@ export function ReviewPage() {
   const progress = (index / cards.length) * 100;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-28">
       <ProgressBar value={progress} label={`${index} / ${cards.length}`} />
-      <FlashCard card={card} revealed={revealed} onReveal={() => setReveal(true)} />
-      {revealed && <RatingButtons onPass={() => handleRate(true)} onFail={() => handleRate(false)} />}
+      <FlashCard card={card} revealed={revealed} />
+      <RatingButtons
+        revealed={revealed}
+        onReveal={() => setReveal(true)}
+        onPass={() => handleRate(true)}
+        onFail={() => handleRate(false)}
+      />
     </div>
   );
 }

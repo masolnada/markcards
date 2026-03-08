@@ -64,7 +64,14 @@ export function NavBar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground font-mono">{__APP_VERSION__}</span>
+          <a
+            href={`https://github.com/masolnada/markcards/commit/${__APP_VERSION__.split('-')[1]}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+          >
+            {__APP_VERSION__}
+          </a>
           <button
             onClick={toggleTheme}
             className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-border/40 transition-colors cursor-pointer"
