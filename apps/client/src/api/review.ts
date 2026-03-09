@@ -5,7 +5,7 @@ export const reviewQueryOptions = (deckId?: string) =>
   queryOptions({
     queryKey: ['review', deckId ?? null],
     queryFn: async (): Promise<ReviewQueue> => {
-      const url = deckId ? `/api/review?deck=${deckId}` : '/api/review';
+      const url = deckId ? `/api/review/${deckId}` : '/api/review';
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch review queue');
       return res.json() as Promise<ReviewQueue>;
