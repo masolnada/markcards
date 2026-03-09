@@ -53,7 +53,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     deckSource = new LocalDeckSource(config.decksDir, cardRepo);
   }
 
-  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const deckService = new DeckService(deckSource, cardRepo);
   const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
   const app = createApp(deckService, reviewService);
 

@@ -1,17 +1,15 @@
 /**
- * Integration tests for review counters and daily new-card limit logic.
+ * Integration tests for review counters and per-deck new-card limit logic.
  *
  * Scenarios covered:
- *  - countNewReviewedToday: zero when nothing reviewed, 1 after first review,
- *    still 1 after card is reviewed a second time in the same session (Again→Good),
- *    0 for a card whose first review was yesterday.
- *  - getStats due count: new-card limit applied correctly; review cards (state>0)
- *    always counted regardless of limit.
- *  - Global review queue: new cards capped at maxNewPerDay total.
- *  - Per-deck review queue: a deck with new cards is not starved by other decks that
- *    fill up the global new-card slot budget (regression for the filter-global-queue bug).
- *  - Mixed review + new cards: review cards appear in the queue even when newLimit=0.
- *  - After exhausting the daily cap: due=0 globally and per-deck.
+ *  - countNewReviewedTodayForDeck: zero when nothing reviewed, 1 after first review,
+ *    still 1 after card is reviewed Again→Good in the same session,
+ *    0 for a card whose first review was yesterday,
+ *    cross-deck isolation (other decks do not affect the count).
+ *  - getStats due count: shows real count without capping.
+ *  - Global review queue: unlimited by default; per-deck max_new frontmatter caps that deck.
+ *  - Per-deck review queue: respects max_new from frontmatter; unlimited when absent.
+ *  - Daily budget resets correctly and remaining budget is tracked per deck.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -42,11 +40,6 @@ function doReview(repo: SqliteCardRepository, cardId: string, rating: Rating, at
   repo.save(cardId, result.card, rating);
 }
 
-/** today's local midnight */
-function localMidnight(d: Date = new Date()): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
 /** a Date clearly in the past (yesterday) */
 function yesterday(): Date {
   const d = new Date();
@@ -55,10 +48,10 @@ function yesterday(): Date {
 }
 
 // ---------------------------------------------------------------------------
-// countNewReviewedToday — direct DB-function tests
+// countNewReviewedTodayForDeck — direct DB-function tests
 // ---------------------------------------------------------------------------
 
-describe('countNewReviewedToday', () => {
+describe('countNewReviewedTodayForDeck', () => {
   let tmpDir: string;
   let cardRepo: SqliteCardRepository;
   const now = new Date();
@@ -76,37 +69,35 @@ describe('countNewReviewedToday', () => {
 
   it('returns 0 when no cards have been reviewed', () => {
     cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
-    expect(cardRepo.countNewReviewedToday(now)).toBe(0);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(0);
   });
 
   it('returns 1 after a new card is reviewed once (Good)', () => {
     cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
     doReview(cardRepo, 'c1', 3, now);
-    expect(cardRepo.countNewReviewedToday(now)).toBe(1);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(1);
   });
 
   it('returns 1 after a new card is reviewed once (Easy — goes straight to Review state)', () => {
     cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
-    doReview(cardRepo, 'c1', 4, now); // Easy: New→Review, reps=1, state=2
-    expect(cardRepo.countNewReviewedToday(now)).toBe(1);
+    doReview(cardRepo, 'c1', 4, now);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(1);
   });
 
-  it('still returns 1 after a card is reviewed Again then Good in the same session (reps rises to 2)', () => {
-    // This is the regression for the `reps = 1` bug:
-    // after the second review reps becomes 2, which the old query missed.
+  it('still returns 1 after a card is reviewed Again then Good in the same session', () => {
     cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
     doReview(cardRepo, 'c1', 1, now); // Again: New→Learning, reps=1
-    expect(cardRepo.countNewReviewedToday(now)).toBe(1); // sanity check mid-session
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(1);
 
     doReview(cardRepo, 'c1', 3, now); // Good: Learning→Review, reps=2
-    expect(cardRepo.countNewReviewedToday(now)).toBe(1); // must STILL be 1
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(1);
   });
 
   it('returns 0 for a card whose first review was yesterday', () => {
     const yd = yesterday();
     cardRepo.ensure('c1', 'deck-x', 'qa', null, yd);
-    doReview(cardRepo, 'c1', 3, yd); // reviewed yesterday
-    expect(cardRepo.countNewReviewedToday(now)).toBe(0);
+    doReview(cardRepo, 'c1', 3, yd);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(0);
   });
 
   it('counts multiple distinct cards reviewed today', () => {
@@ -114,27 +105,33 @@ describe('countNewReviewedToday', () => {
       cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
       doReview(cardRepo, `c${i}`, 3, now);
     }
-    expect(cardRepo.countNewReviewedToday(now)).toBe(3);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(3);
   });
 
   it('does not double-count a card reviewed many times today', () => {
     cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
-    doReview(cardRepo, 'c1', 1, now); // Again → Learning, reps=1
-    doReview(cardRepo, 'c1', 1, now); // Again → Learning, reps=2
-    doReview(cardRepo, 'c1', 3, now); // Good → Review, reps=3
-    expect(cardRepo.countNewReviewedToday(now)).toBe(1);
+    doReview(cardRepo, 'c1', 1, now);
+    doReview(cardRepo, 'c1', 1, now);
+    doReview(cardRepo, 'c1', 3, now);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(1);
   });
 
   it('does not count a review-state card reviewed today as a new card consumed', () => {
-    // Simulate a card that was first reviewed yesterday (used a slot yesterday)
-    // and is reviewed again today from Review state — should NOT consume today's slot.
     const yd = yesterday();
     cardRepo.ensure('c1', 'deck-x', 'qa', null, yd);
     doReview(cardRepo, 'c1', 4, yd); // Easy: New→Review yesterday
 
-    // Today the card is due and reviewed again
     doReview(cardRepo, 'c1', 3, now); // Good from Review state today
-    expect(cardRepo.countNewReviewedToday(now)).toBe(0);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(0);
+  });
+
+  it('does not count cards from other decks', () => {
+    cardRepo.ensure('c1', 'deck-x', 'qa', null, now);
+    cardRepo.ensure('c2', 'deck-y', 'qa', null, now);
+    doReview(cardRepo, 'c1', 3, now);
+    doReview(cardRepo, 'c2', 3, now);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-x', now)).toBe(1);
+    expect(cardRepo.countNewReviewedTodayForDeck('deck-y', now)).toBe(1);
   });
 });
 
@@ -158,7 +155,7 @@ describe('getStats', () => {
     rmSync(tmpDir, { recursive: true });
   });
 
-  it('counts all new cards as due when limit is Infinity', () => {
+  it('counts all new cards as due', () => {
     for (let i = 0; i < 5; i++) cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
     const stats = cardRepo.getStats('deck-x', now);
     expect(stats.total).toBe(5);
@@ -166,50 +163,16 @@ describe('getStats', () => {
     expect(stats.newCards).toBe(5);
   });
 
-  it('caps due new cards at newLimit', () => {
-    for (let i = 0; i < 5; i++) cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
-    const stats = cardRepo.getStats('deck-x', now, 3);
-    expect(stats.due).toBe(3);
-    expect(stats.newCards).toBe(5); // total new unchanged
-  });
+  it('always counts review-state (state>0) due cards', () => {
+    const past = new Date(now.getTime() - 2 * 60 * 1000); // 2 minutes ago
+    cardRepo.ensure('r4', 'deck-x', 'qa', null, past);
+    doReview(cardRepo, 'r4', 1, past); // Again from New at past → state=1, due ~1 min ago
 
-  it('shows 0 new due cards when newLimit is 0', () => {
-    for (let i = 0; i < 3; i++) cardRepo.ensure(`c${i}`, 'deck-x', 'qa', null, now);
-    const stats = cardRepo.getStats('deck-x', now, 0);
-    expect(stats.due).toBe(0);
-  });
-
-  it('always counts review-state (state>0) due cards regardless of newLimit', () => {
-    // Create a card and graduate it to Review state
-    cardRepo.ensure('r1', 'deck-x', 'qa', null, now);
-    // Manually advance it: review as Easy to go New→Review, then set due to now
-    doReview(cardRepo, 'r1', 4, yesterday()); // reviewed yesterday → now in Review with some future due
-    // Force due date to now by reviewing again... or just add a new card in review state directly
-    // Actually easier: add 2 new cards + put them in review state, then add 3 new cards
     cardRepo.ensure('new1', 'deck-x', 'qa', null, now);
     cardRepo.ensure('new2', 'deck-x', 'qa', null, now);
 
-    // r1 was reviewed yesterday with Easy → state=2, due = yesterday + stability days (>= 1 day from now)
-    // So it's NOT due today yet. We need a review card that IS due now.
-    // Let's use Again to create a Relearning card with short interval instead:
-    cardRepo.ensure('r2', 'deck-x', 'qa', null, now);
-    doReview(cardRepo, 'r2', 4, yesterday()); // New→Review, reps=1
-    // After Easy, scheduled_days = round(stability * W[16]). Due is yesterday + that many days.
-    // Might not be due today. Let's use a direct approach: create a Learning card (state=1) due now.
-    cardRepo.ensure('r3', 'deck-x', 'qa', null, now);
-    doReview(cardRepo, 'r3', 1, now); // Again: New→Learning (state=1), due in 1 minute from now = due soon
-    // Learning card due in 1 minute is NOT due yet if we check "now" before 1 minute has elapsed.
-    // For simplicity: just test that review-state cards with due<=now are counted.
-    // We know r3 is now state=1 with due = now+1min, so it's not due at `now`.
-    // Instead, let's use a well-known approach: review with Good from Learning immediately.
-    // Easier: set up via ensure with a past date so the card is already overdue.
-    const past = new Date(now.getTime() - 2 * 60 * 1000); // 2 minutes ago
-    cardRepo.ensure('r4', 'deck-x', 'qa', null, past);
-    doReview(cardRepo, 'r4', 1, past); // Again from New at past → state=1, due = past+1min = 1min ago = due now
-
-    // Now r4 is in Learning state and due (1 min ago). newLimit=0 must not hide it.
-    const stats = cardRepo.getStats('deck-x', now, 0);
-    expect(stats.due).toBeGreaterThanOrEqual(1); // r4 must appear in due
+    const stats = cardRepo.getStats('deck-x', now);
+    expect(stats.due).toBeGreaterThanOrEqual(1); // r4 (Learning, due) must appear
   });
 });
 
@@ -217,8 +180,12 @@ describe('getStats', () => {
 // API-level integration tests
 // ---------------------------------------------------------------------------
 
-const DECK_A = ['Q: A1?', 'A: a1', '', 'Q: A2?', 'A: a2', '', 'Q: A3?', 'A: a3'].join('\n');
-const DECK_B = ['Q: B1?', 'A: b1', '', 'Q: B2?', 'A: b2', '', 'Q: B3?', 'A: b3'].join('\n');
+const DECK_A_UNLIMITED = ['Q: A1?', 'A: a1', '', 'Q: A2?', 'A: a2', '', 'Q: A3?', 'A: a3'].join('\n');
+const DECK_B_UNLIMITED = ['Q: B1?', 'A: b1', '', 'Q: B2?', 'A: b2', '', 'Q: B3?', 'A: b3'].join('\n');
+
+function deckWithLimit(limit: number, cards: string): string {
+  return `---\nmax_new = ${limit}\n---\n${cards}`;
+}
 
 let tmpDir: string;
 let deckA: Deck;
@@ -234,8 +201,8 @@ beforeEach(async () => {
   initDb(db);
   cardRepo = new SqliteCardRepository(db);
 
-  writeFileSync(join(tmpDir, 'deck-a.md'), DECK_A);
-  writeFileSync(join(tmpDir, 'deck-b.md'), DECK_B);
+  writeFileSync(join(tmpDir, 'deck-a.md'), DECK_A_UNLIMITED);
+  writeFileSync(join(tmpDir, 'deck-b.md'), DECK_B_UNLIMITED);
 
   deckSource = new LocalDeckSource(tmpDir, cardRepo);
   await deckSource.sync(true);
@@ -246,7 +213,7 @@ beforeEach(async () => {
 
   const settingsRepo = new JsonSettingsRepository(join(tmpDir, 'settings.json'));
   const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
-  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const deckService = new DeckService(deckSource, cardRepo);
   const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
   app = createApp(deckService, reviewService, tmpDir);
 });
@@ -255,140 +222,117 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true });
 });
 
-describe('Global new-card cap', () => {
-  it('global /api/review queue is capped at maxNewPerDay', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
+describe('Default (no max_new) — unlimited new cards', () => {
+  it('global /api/review returns all new cards from all decks', async () => {
     const res = await request(app).get('/api/review');
     expect(res.status).toBe(200);
-    expect(res.body.cards).toHaveLength(2);
+    expect(res.body.cards).toHaveLength(6); // 3 + 3
   });
 
-  it('review cards (state>0) appear in queue even when maxNewPerDay=0', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 20 }));
-
-    // Graduate one card to Review state with Easy (it will have a future due, not due today)
-    // so first review it, then we'll check with maxNewPerDay=0 that review-due cards still appear.
-    // Simpler: review a card with Again so it becomes a Learning card due very soon.
-    // Actually, let's use the past-due trick via direct DB manipulation outside the app.
-    // For a pure API test: review card with pass=true (Good rating), then set maxNewPerDay=0.
-    // After reviewing a card it goes to Learning (due in 10 min) — not due. So we can't easily
-    // test this through the API alone without time manipulation.
-    // Instead, verify that review cards ARE counted in deck stats even with newLimit=0:
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 20 }));
-    const before = await request(app).get('/api/decks');
-    for (const d of before.body) {
-      expect(d.stats.due).toBe(d.stats.total); // all new = all due at default limit
-    }
+  it('per-deck endpoint returns all new cards', async () => {
+    const resA = await request(app).get(`/api/review/${deckA.id}`);
+    const resB = await request(app).get(`/api/review/${deckB.id}`);
+    expect(resA.body.cards).toHaveLength(3);
+    expect(resB.body.cards).toHaveLength(3);
   });
 
-  it('after reviewing capped new cards, global queue shows 0', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
-    const queue = await request(app).get('/api/review');
-    for (const card of queue.body.cards) {
-      await request(app).post('/api/review').send({ cardId: card.cardId, pass: true });
-    }
-    const after = await request(app).get('/api/review');
-    expect(after.body.cards).toHaveLength(0);
-  });
-
-  it('deck stats due=0 for all decks after daily cap exhausted', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
-    const queue = await request(app).get('/api/review');
-    for (const card of queue.body.cards) {
-      await request(app).post('/api/review').send({ cardId: card.cardId, pass: true });
-    }
+  it('deck stats due equals total for all decks', async () => {
     const decks = (await request(app).get('/api/decks')).body;
     for (const deck of decks) {
-      expect(deck.stats.due).toBe(0);
+      expect(deck.stats.due).toBe(deck.stats.total);
     }
   });
 });
 
-describe('Per-deck new-card queue is not starved by other decks', () => {
-  // Regression: the old implementation called getNewIdsForQueue(now, globalLimit)
-  // then filtered by deckId. If the global limit was filled by cards from other decks
-  // (which sort earlier by `due`), the requested deck got 0 new cards despite having budget.
-
-  it('per-deck review returns new cards from the correct deck even when another deck loads first', async () => {
-    // Both decks have 3 new cards; cap = 3. If the global queue fills up with deck-a cards,
-    // deck-b would get 0 without the fix. With the fix, each deck gets up to `newLimit` cards
-    // from its own pool.
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 3 }));
-
-    const resA = await request(app).get(`/api/review/${deckA.id}`);
-    const resB = await request(app).get(`/api/review/${deckB.id}`);
-
-    expect(resA.status).toBe(200);
-    expect(resB.status).toBe(200);
-
-    // Each deck has 3 new cards; global cap is 3 → each per-deck queue should show up to 3
-    expect(resA.body.cards).toHaveLength(3);
-    expect(resB.body.cards).toHaveLength(3);
-
-    // Every card must belong to the requested deck
-    for (const c of resA.body.cards) expect(c.deckId).toBe(deckA.id);
-    for (const c of resB.body.cards) expect(c.deckId).toBe(deckB.id);
+describe('Per-deck max_new frontmatter cap', () => {
+  beforeEach(async () => {
+    // Rewrite deck-a with max_new = 2
+    writeFileSync(join(tmpDir, 'deck-a.md'), deckWithLimit(2, 'Q: A1?\nA: a1\n\nQ: A2?\nA: a2\n\nQ: A3?\nA: a3'));
+    await deckSource.sync(true);
+    deckA = deckSource.getAll().find(d => d.name === 'deck-a')!;
   });
 
-  it('per-deck review respects the remaining global budget', async () => {
-    // Cap=2, review 2 cards from deck-a. Budget now exhausted.
-    // Per-deck review of deck-b should show 0 new cards.
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
+  it('global queue: limited deck contributes max_new, unlimited deck contributes all', async () => {
+    const res = await request(app).get('/api/review');
+    expect(res.status).toBe(200);
+    expect(res.body.cards).toHaveLength(5); // deck-a: 2, deck-b: 3
+  });
 
+  it('per-deck queue for limited deck returns at most max_new cards', async () => {
+    const res = await request(app).get(`/api/review/${deckA.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.cards).toHaveLength(2);
+    for (const c of res.body.cards) expect(c.deckId).toBe(deckA.id);
+  });
+
+  it('per-deck queue for unlimited deck returns all cards', async () => {
+    const res = await request(app).get(`/api/review/${deckB.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.cards).toHaveLength(3);
+  });
+
+  it('after exhausting deck-a limit, deck-a per-deck queue shows 0 new cards', async () => {
     const queueA = await request(app).get(`/api/review/${deckA.id}`);
     for (const card of queueA.body.cards) {
       await request(app).post('/api/review').send({ cardId: card.cardId, pass: true });
     }
 
-    const queueB = await request(app).get(`/api/review/${deckB.id}`);
-    // All new card budget consumed; deck-b should have 0 new cards available
-    expect(queueB.body.cards).toHaveLength(0);
+    const afterA = await request(app).get(`/api/review/${deckA.id}`);
+    // Learning cards (state=1) due in the future won't appear; new slots exhausted
+    const newCards = afterA.body.cards.filter((c: { cardId: string }) =>
+      !queueA.body.cards.some((q: { cardId: string }) => q.cardId === c.cardId)
+    );
+    expect(newCards).toHaveLength(0);
+  });
+
+  it('after exhausting deck-a limit, deck-b still shows all cards in global queue', async () => {
+    const queueA = await request(app).get(`/api/review/${deckA.id}`);
+    for (const card of queueA.body.cards) {
+      await request(app).post('/api/review').send({ cardId: card.cardId, pass: true });
+    }
+
+    const globalQueue = await request(app).get('/api/review');
+    const deckBCards = globalQueue.body.cards.filter((c: { deckId: string }) => c.deckId === deckB.id);
+    expect(deckBCards).toHaveLength(3);
+  });
+
+  it('deck stats shows real due count (not capped by max_new)', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckAStats = decks.find((d: { id: string }) => d.id === deckA.id);
+    // Stats always shows real count — all 3 are due
+    expect(deckAStats.stats.due).toBe(3);
+    expect(deckAStats.stats.newCards).toBe(3);
   });
 });
 
 describe('Daily budget counter is correct across multiple reviews of the same card', () => {
-  it('a card reviewed Again then Good still counts as 1 toward the daily cap', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
+  beforeEach(async () => {
+    writeFileSync(join(tmpDir, 'deck-a.md'), deckWithLimit(2, 'Q: A1?\nA: a1\n\nQ: A2?\nA: a2\n\nQ: A3?\nA: a3'));
+    await deckSource.sync(true);
+    deckA = deckSource.getAll().find(d => d.name === 'deck-a')!;
+  });
 
-    // Get one card from deck-a and review it with fail (Again)
+  it('a card reviewed Again then Good still counts as 1 toward the daily cap', async () => {
     const queueFirst = await request(app).get(`/api/review/${deckA.id}`);
     const firstCard = queueFirst.body.cards[0];
 
-    await request(app).post('/api/review').send({ cardId: firstCard.cardId, pass: false }); // Again → Learning, reps=1
-    // The card is now in Learning state and due in ~1 min (not in new queue anymore).
-    // From this point, countNewReviewedToday should be 1.
+    await request(app).post('/api/review').send({ cardId: firstCard.cardId, pass: false }); // Again → Learning
 
-    // Review a second new card
+    // 1 slot used out of 2 — should see 1 new card remaining
     const queueSecond = await request(app).get(`/api/review/${deckA.id}`);
-    // Only 1 new card slot remains (cap=2, 1 consumed). Should be exactly 1 new card.
-    const secondNewCards = queueSecond.body.cards.filter((c: { cardId: string }) => c.cardId !== firstCard.cardId);
+    const secondNewCards = queueSecond.body.cards.filter(
+      (c: { cardId: string }) => c.cardId !== firstCard.cardId
+    );
     expect(secondNewCards).toHaveLength(1);
 
     await request(app).post('/api/review').send({ cardId: secondNewCards[0].cardId, pass: true });
 
-    // Both slots used — deck-a should show 0 new cards due
-    const stats = (await request(app).get('/api/decks')).body
-      .find((d: { id: string }) => d.id === deckA.id);
-    expect(stats.stats.due).toBe(0);
-  });
-});
-
-describe('Deck stats reflect remaining new-card budget', () => {
-  it('shows due count capped at maxNewPerDay per deck before any review', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
-    const decks = (await request(app).get('/api/decks')).body;
-    for (const deck of decks) {
-      // Each deck has 3 new cards but cap is 2
-      expect(deck.stats.due).toBe(2);
-      expect(deck.stats.newCards).toBe(3);
-    }
-  });
-
-  it('shows full due count when maxNewPerDay exceeds card count', async () => {
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 100 }));
-    const decks = (await request(app).get('/api/decks')).body;
-    for (const deck of decks) {
-      expect(deck.stats.due).toBe(deck.stats.total);
-    }
+    // Both slots used — no more new cards from deck-a
+    const queueFinal = await request(app).get(`/api/review/${deckA.id}`);
+    const finalNewCards = queueFinal.body.cards.filter(
+      (c: { cardId: string }) =>
+        c.cardId !== firstCard.cardId && c.cardId !== secondNewCards[0].cardId
+    );
+    expect(finalNewCards).toHaveLength(0);
   });
 });

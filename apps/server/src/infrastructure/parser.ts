@@ -25,6 +25,7 @@ function countBrackets(template: string): number {
 export function parseDeck(filePath: string, content: string): Deck {
   const id = deckId(filePath);
   let name = filePath.split('/').pop()?.replace(/\.md$/, '') ?? 'Unnamed Deck';
+  let maxNewPerDay: number | undefined;
   let body = content;
 
   if (content.startsWith('---')) {
@@ -33,6 +34,8 @@ export function parseDeck(filePath: string, content: string): Deck {
       const frontmatter = content.slice(3, end);
       const nameMatch = frontmatter.match(/^name\s*=\s*"([^"]+)"/m);
       if (nameMatch) name = nameMatch[1];
+      const maxNewMatch = frontmatter.match(/^max_new\s*=\s*(\d+)/m);
+      if (maxNewMatch) maxNewPerDay = parseInt(maxNewMatch[1], 10);
       body = content.slice(end + 4);
     }
   }
@@ -117,5 +120,5 @@ export function parseDeck(filePath: string, content: string): Deck {
     }
   }
 
-  return { id, name, filePath, cards };
+  return { id, name, filePath, cards, ...(maxNewPerDay !== undefined ? { maxNewPerDay } : {}) };
 }

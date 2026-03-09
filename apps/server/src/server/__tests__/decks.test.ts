@@ -35,7 +35,7 @@ beforeEach(async () => {
 
   const settingsRepo = new JsonSettingsRepository(join(tmpDir, 'settings.json'));
   const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
-  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const deckService = new DeckService(deckSource, cardRepo);
   const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
   app = createApp(deckService, reviewService, tmpDir);
 });
@@ -67,34 +67,23 @@ describe('GET /api/decks', () => {
   });
 });
 
-describe('GET /api/decks — due count after completing a review session', () => {
-  // Regression test: after reviewing all cards within the daily new-card limit,
-  // the deck list must show due=0 even if new cards remain beyond the daily cap.
-  beforeEach(() => {
-    // settingsRepo uses the file path; tests write to it directly
-  });
-
-  it('shows due=0 for all decks after the daily new-card limit is exhausted', async () => {
-    // 5 total new cards (deck-a: 2, deck-b: 3); cap at 2 so 3 cards are unreachable today
-    writeFileSync(join(tmpDir, 'settings.json'), JSON.stringify({ maxNewPerDay: 2 }));
-
-    // Confirm global queue is capped at 2
+describe('GET /api/decks — stats after reviewing', () => {
+  it('reviewed cards are no longer due; unreviewed new cards remain due', async () => {
+    // Review all cards from deck-a (2 cards)
     const globalQueue = await request(app).get('/api/review');
-    expect(globalQueue.body.cards).toHaveLength(2);
-
-    // Review all 2 cards — daily limit is now exhausted
-    for (const card of globalQueue.body.cards) {
+    const deckACards = globalQueue.body.cards.filter((c: { deckId: string }) => {
+      const decks = deckSource.getAll();
+      const deckA = decks.find(d => d.name === 'deck-a');
+      return deckA && c.deckId === deckA.id;
+    });
+    for (const card of deckACards) {
       await request(app).post('/api/review').send({ cardId: card.cardId, pass: true });
     }
 
-    // Every deck must show due=0: reviewed cards have future due dates,
-    // and remaining new cards are beyond today's daily cap
     const decks = (await request(app).get('/api/decks')).body;
-    for (const deck of decks) {
-      expect(deck.stats.due).toBe(0);
-    }
-    // deck-b still has all 3 of its cards in the new state (none were served today)
+    // deck-b still has all its cards as new and due
     const deckB = decks.find((d: { name: string }) => d.name === 'deck-b');
     expect(deckB.stats.newCards).toBe(3);
+    expect(deckB.stats.due).toBe(3);
   });
 });

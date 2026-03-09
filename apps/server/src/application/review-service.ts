@@ -15,10 +15,19 @@ export class ReviewService {
 
   async getDueCards(now: Date): Promise<{ cards: RenderedCard[]; total: number }> {
     await this.decks.sync();
-    const settings = this.settings.get();
-    const newLimit = Math.max(0, settings.maxNewPerDay - this.cards.countNewReviewedToday(now));
     const reviewCards = this.cards.getDueReviewIds(now);
-    const newCards = this.cards.getNewIdsForQueue(now, newLimit);
+
+    const newCards: { cardId: string; deckId: string }[] = [];
+    for (const deck of this.decks.getAll()) {
+      if (deck.maxNewPerDay !== undefined) {
+        const reviewed = this.cards.countNewReviewedTodayForDeck(deck.id, now);
+        const remaining = Math.max(0, deck.maxNewPerDay - reviewed);
+        newCards.push(...this.cards.getNewIdsForDeckQueue(deck.id, now, remaining));
+      } else {
+        newCards.push(...this.cards.getNewIdsForDeckQueue(deck.id, now));
+      }
+    }
+
     const due = [...reviewCards, ...newCards];
 
     const rendered: RenderedCard[] = [];
@@ -37,10 +46,15 @@ export class ReviewService {
     const deck = this.decks.getById(deckId);
     if (!deck) return null;
 
-    const settings = this.settings.get();
-    const newLimit = Math.max(0, settings.maxNewPerDay - this.cards.countNewReviewedToday(now));
     const reviewCards = this.cards.getDueReviewIdsForDeck(deckId, now);
-    const newCards = this.cards.getNewIdsForDeckQueue(deckId, now, newLimit);
+    let newCards: { cardId: string; deckId: string }[];
+    if (deck.maxNewPerDay !== undefined) {
+      const reviewed = this.cards.countNewReviewedTodayForDeck(deckId, now);
+      const remaining = Math.max(0, deck.maxNewPerDay - reviewed);
+      newCards = this.cards.getNewIdsForDeckQueue(deckId, now, remaining);
+    } else {
+      newCards = this.cards.getNewIdsForDeckQueue(deckId, now);
+    }
     const due = [...reviewCards, ...newCards];
 
     const rendered: RenderedCard[] = [];

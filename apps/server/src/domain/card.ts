@@ -14,4 +14,5 @@ export interface Deck {
   name: string;
   filePath: string;
   cards: Card[];
+  maxNewPerDay?: number;
 }

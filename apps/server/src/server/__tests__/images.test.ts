@@ -53,7 +53,7 @@ beforeEach(async () => {
   const settingsRepo = new JsonSettingsRepository(join(tmpDir, 'settings.json'));
   // Pass tmpDir as decksDir so image URLs are resolved against it
   const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
-  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const deckService = new DeckService(deckSource, cardRepo);
   const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
   app = createApp(deckService, reviewService, tmpDir);
 });

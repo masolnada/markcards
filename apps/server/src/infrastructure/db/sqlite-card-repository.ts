@@ -95,43 +95,43 @@ export class SqliteCardRepository implements CardRepository {
     return rows.map(r => ({ cardId: r.card_id, deckId }));
   }
 
-  getNewIdsForQueue(now: Date, limit: number): { cardId: string; deckId: string }[] {
-    if (limit <= 0) return [];
-    const rows = this.db.query<{ card_id: string; deck_id: string }, [string, number]>(
-      `SELECT card_id, deck_id FROM cards WHERE state = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
-    ).all(now.toISOString(), limit);
-    return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
-  }
-
-  getNewIdsForDeckQueue(deckId: string, now: Date, limit: number): { cardId: string; deckId: string }[] {
-    if (limit <= 0) return [];
-    const rows = this.db.query<{ card_id: string }, [string, string, number]>(
-      `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
-    ).all(deckId, now.toISOString(), limit);
+  getNewIdsForDeckQueue(deckId: string, now: Date, limit?: number): { cardId: string; deckId: string }[] {
+    if (limit !== undefined && limit <= 0) return [];
+    if (limit !== undefined) {
+      const rows = this.db.query<{ card_id: string }, [string, string, number]>(
+        `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
+      ).all(deckId, now.toISOString(), limit);
+      return rows.map(r => ({ cardId: r.card_id, deckId }));
+    }
+    const rows = this.db.query<{ card_id: string }, [string, string]>(
+      `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND due <= ? ORDER BY due ASC`
+    ).all(deckId, now.toISOString());
     return rows.map(r => ({ cardId: r.card_id, deckId }));
   }
 
-  countNewReviewedToday(now: Date): number {
+  countNewReviewedTodayForDeck(deckId: string, now: Date): number {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const result = this.db.query<{ c: number }, [string]>(`
+    const result = this.db.query<{ c: number }, [string, string]>(`
       SELECT COUNT(*) as c FROM (
-        SELECT MIN(id) as first_id FROM review_log GROUP BY card_id
+        SELECT MIN(rl.id) as first_id FROM review_log rl
+        JOIN cards c ON c.card_id = rl.card_id
+        WHERE c.deck_id = ?
+        GROUP BY rl.card_id
       ) first_reviews
       JOIN review_log rl ON rl.id = first_reviews.first_id
       WHERE rl.review_time >= ?
-    `).get(todayStart.toISOString())!;
+    `).get(deckId, todayStart.toISOString())!;
     return result.c;
   }
 
-  getStats(deckId: string, now: Date, newLimit = Infinity): DeckStats {
+  getStats(deckId: string, now: Date): DeckStats {
     const total = this.db.query<{ c: number }, [string]>('SELECT COUNT(*) as c FROM cards WHERE deck_id = ?').get(deckId)!.c;
     const dueReview = this.db.query<{ c: number }, [string, string]>(
       `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state > 0 AND due <= ?`
     ).get(deckId, now.toISOString())!.c;
-    const newDueRaw = this.db.query<{ c: number }, [string, string]>(
+    const dueNew = this.db.query<{ c: number }, [string, string]>(
       `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0 AND due <= ?`
     ).get(deckId, now.toISOString())!.c;
-    const dueNew = isFinite(newLimit) ? Math.min(newDueRaw, Math.max(0, newLimit)) : newDueRaw;
     const due = dueReview + dueNew;
     const newCards = this.db.query<{ c: number }, [string]>(
       `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0`

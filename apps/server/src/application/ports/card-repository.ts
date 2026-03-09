@@ -15,8 +15,7 @@ export interface CardRepository {
   save(id: string, card: FSRSCard, rating: Rating): void;
   getDueReviewIds(now: Date): { cardId: string; deckId: string }[];
   getDueReviewIdsForDeck(deckId: string, now: Date): { cardId: string; deckId: string }[];
-  getNewIdsForQueue(now: Date, limit: number): { cardId: string; deckId: string }[];
-  getNewIdsForDeckQueue(deckId: string, now: Date, limit: number): { cardId: string; deckId: string }[];
-  countNewReviewedToday(now: Date): number;
-  getStats(deckId: string, now: Date, newLimit?: number): DeckStats;
+  getNewIdsForDeckQueue(deckId: string, now: Date, limit?: number): { cardId: string; deckId: string }[];
+  countNewReviewedTodayForDeck(deckId: string, now: Date): number;
+  getStats(deckId: string, now: Date): DeckStats;
 }

@@ -50,7 +50,7 @@ beforeEach(async () => {
   settingsRepo = new JsonSettingsRepository(settingsFile);
 
   const renderer = new HtmlCardRenderer({ decksDir: tmpDir, githubBranch: 'main' });
-  const deckService = new DeckService(deckSource, cardRepo, settingsRepo);
+  const deckService = new DeckService(deckSource, cardRepo);
   const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
   app = createApp(deckService, reviewService, tmpDir);
 });
@@ -60,51 +60,11 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true });
 });
 
-describe('maxNewPerDay', () => {
-  it('returns all 3 new cards when no settings file exists (uses default of 20)', async () => {
+describe('default (no max_new) — all new cards shown', () => {
+  it('returns all 3 new cards when no settings file exists', async () => {
     const res = await request(app).get('/api/review');
     expect(res.status).toBe(200);
     expect(res.body.cards).toHaveLength(3);
-  });
-
-  it('returns 0 cards when maxNewPerDay is 0', async () => {
-    writeFileSync(settingsFile, JSON.stringify({ maxNewPerDay: 0 }));
-
-    const res = await request(app).get('/api/review');
-    expect(res.status).toBe(200);
-    expect(res.body.cards).toHaveLength(0);
-  });
-
-  it('returns exactly 2 cards when maxNewPerDay is 2', async () => {
-    writeFileSync(settingsFile, JSON.stringify({ maxNewPerDay: 2 }));
-
-    const res = await request(app).get('/api/review');
-    expect(res.status).toBe(200);
-    expect(res.body.cards).toHaveLength(2);
-  });
-
-  it('limits count on deck-specific endpoint too', async () => {
-    writeFileSync(settingsFile, JSON.stringify({ maxNewPerDay: 1 }));
-
-    const res = await request(app).get(`/api/review/${deck.id}`);
-    expect(res.status).toBe(200);
-    expect(res.body.cards).toHaveLength(1);
-  });
-
-  it('counts new cards reviewed today toward the limit', async () => {
-    writeFileSync(settingsFile, JSON.stringify({ maxNewPerDay: 2 }));
-
-    // Review one card — uses limit slot
-    const listRes = await request(app).get('/api/review');
-    const cardId = listRes.body.cards[0].cardId;
-    await request(app).post('/api/review').send({ cardId, pass: true });
-
-    // Now only 1 slot remains
-    const res = await request(app).get('/api/review');
-    expect(res.status).toBe(200);
-    // 1 card still in Learning (due soon), 1 new slot left → 2 total or fewer
-    const newCards = res.body.cards.filter((c: any) => c.cardId !== cardId);
-    expect(newCards.length).toBeLessThanOrEqual(1);
   });
 });
 
