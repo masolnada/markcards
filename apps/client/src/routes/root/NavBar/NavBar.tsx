@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { useTheme } from '@markcards/ui';
+import { useTheme, Icon } from '@markcards/ui';
 
 function SunIcon() {
   return (
@@ -47,7 +47,10 @@ export function NavBar() {
     <header className="border-b border-border bg-background sticky top-0 z-50">
       <div className="container mx-auto px-4 max-w-3xl h-12 flex items-center justify-between">
         <nav className="flex items-center gap-6">
-          <span className="font-mono font-semibold text-sm text-foreground tracking-tight">markcards</span>
+          <span className="flex items-center gap-2 font-mono font-semibold text-sm text-foreground tracking-tight">
+            <Icon />
+            markcards
+          </span>
           <Link
             to="/review"
             search={{ deck: undefined }}

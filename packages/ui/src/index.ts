@@ -15,3 +15,5 @@ export type { ProgressBarProps } from './atoms/ProgressBar';
 export { Spinner } from './atoms/Spinner';
 export type { SpinnerProps, SpinnerSize } from './atoms/Spinner';
 
+export { Icon } from './atoms/Icon';
+
