@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcProgress } from '../pages/review.js';
+import { calcProgress } from './review.js';
 
 describe('calcProgress', () => {
   it('is 0% at the start with no cards reviewed', () => {

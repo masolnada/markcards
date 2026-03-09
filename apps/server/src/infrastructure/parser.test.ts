@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDeck } from '../../infrastructure/parser.js';
+import { parseDeck } from './parser.js';
 
 describe('parseDeck — QA cards', () => {
   it('parses a basic QA card', () => {

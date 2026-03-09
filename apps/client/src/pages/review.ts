@@ -203,6 +203,4 @@ function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export function calcProgress(reviewed: number, total: number): number {
-  return total > 0 ? (reviewed / total) * 100 : 0;
-}
+export { calcProgress } from '../utils/review.js';
