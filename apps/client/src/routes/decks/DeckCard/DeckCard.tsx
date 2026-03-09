@@ -28,7 +28,7 @@ export function DeckCard({ deck, onReview }: DeckCardProps) {
           disabled={!hasDue}
           onClick={onReview}
           size="sm"
-          className="w-24"
+          className="w-32"
         >
           {hasDue ? 'Review' : 'Up to date'}
         </Button>
