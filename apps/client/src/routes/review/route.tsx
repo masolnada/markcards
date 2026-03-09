@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useSearch, Link } from '@tanstack/react-router';
 import { Spinner, ProgressBar, Button } from '@markcards/ui';
 import { EmptyState } from '../../_shared/EmptyState';
@@ -16,7 +16,6 @@ interface SessionStats {
 
 export function ReviewPage() {
   const { deck: deckId } = useSearch({ from: '/review' });
-  const queryClient = useQueryClient();
   const { data: queue, isLoading, error } = useQuery(reviewQueryOptions(deckId));
 
   const [index, setIndex] = useState(0);
@@ -101,21 +100,9 @@ export function ReviewPage() {
             { label: 'Failed', value: stats.failed },
           ]}
         />
-        <div className="flex gap-3">
-          <Link to="/decks">
-            <Button variant="secondary">Decks</Button>
-          </Link>
-          <Button
-            onClick={() => {
-              setIndex(0);
-              setReveal(false);
-              setStats({ reviewed: 0, passed: 0, failed: 0 });
-              queryClient.invalidateQueries(reviewQueryOptions(deckId));
-            }}
-          >
-            Review again
-          </Button>
-        </div>
+        <Link to="/decks">
+          <Button variant="secondary">Decks</Button>
+        </Link>
       </div>
     );
   }
