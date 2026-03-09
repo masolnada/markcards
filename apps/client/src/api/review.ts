@@ -10,6 +10,8 @@ export const reviewQueryOptions = (deckId?: string) =>
       if (!res.ok) throw new Error('Failed to fetch review queue');
       return res.json() as Promise<ReviewQueue>;
     },
+    staleTime: Infinity,
+    refetchOnMount: 'always',
   });
 
 export const submitReview = async (cardId: string, pass: boolean): Promise<ReviewResult> => {
