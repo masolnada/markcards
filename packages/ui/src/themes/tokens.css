@@ -1,44 +1,45 @@
 @theme {
+  /* Font */
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
   /* Surfaces */
-  --color-background: oklch(1 0 0);
-  --color-surface: oklch(0.97 0.002 286);
+  --color-background: oklch(0.98 0 0);
+  --color-surface: oklch(0.95 0 0);
   --color-card: oklch(1 0 0);
 
   /* Borders */
-  --color-border: oklch(0.90 0.002 286);
+  --color-border: oklch(0.68 0 0);
 
   /* Text */
-  --color-foreground: oklch(0.145 0.005 286);
-  --color-card-foreground: oklch(0.145 0.005 286);
-  --color-muted-foreground: oklch(0.50 0.005 286);
+  --color-foreground: oklch(0.08 0 0);
+  --color-card-foreground: oklch(0.08 0 0);
+  --color-muted-foreground: oklch(0.46 0 0);
 
-  /* Brand */
-  --color-primary: oklch(0.585 0.233 264);
-  --color-primary-foreground: oklch(1 0 0);
-
-  /* Semantic */
-  --color-success: oklch(0.723 0.183 142);
-  --color-success-foreground: oklch(1 0 0);
-  --color-danger: oklch(0.637 0.237 25);
-  --color-danger-foreground: oklch(1 0 0);
-  --color-warning: oklch(0.769 0.189 70);
-  --color-warning-foreground: oklch(0.15 0 0);
+  /* All semantic colors → monochrome ink */
+  --color-primary: oklch(0.08 0 0);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-success: oklch(0.08 0 0);
+  --color-success-foreground: oklch(0.98 0 0);
+  --color-danger: oklch(0.08 0 0);
+  --color-danger-foreground: oklch(0.98 0 0);
+  --color-warning: oklch(0.08 0 0);
+  --color-warning-foreground: oklch(0.98 0 0);
 }
 
 [data-theme='dark'] {
-  --color-background: oklch(0.145 0.005 286);
-  --color-surface: oklch(0.205 0.005 286);
-  --color-card: oklch(0.205 0.005 286);
-  --color-border: oklch(0.30 0.005 286);
-  --color-foreground: oklch(0.95 0 0);
-  --color-card-foreground: oklch(0.95 0 0);
-  --color-muted-foreground: oklch(0.65 0 0);
-  --color-primary: oklch(0.68 0.22 264);
-  --color-primary-foreground: oklch(0.145 0 0);
-  --color-success: oklch(0.79 0.17 142);
-  --color-success-foreground: oklch(0.145 0 0);
-  --color-danger: oklch(0.72 0.21 25);
-  --color-danger-foreground: oklch(0.145 0 0);
-  --color-warning: oklch(0.83 0.17 70);
-  --color-warning-foreground: oklch(0.145 0 0);
+  --color-background: oklch(0.10 0 0);
+  --color-surface: oklch(0.14 0 0);
+  --color-card: oklch(0.14 0 0);
+  --color-border: oklch(0.34 0 0);
+  --color-foreground: oklch(0.92 0 0);
+  --color-card-foreground: oklch(0.92 0 0);
+  --color-muted-foreground: oklch(0.56 0 0);
+  --color-primary: oklch(0.92 0 0);
+  --color-primary-foreground: oklch(0.10 0 0);
+  --color-success: oklch(0.92 0 0);
+  --color-success-foreground: oklch(0.10 0 0);
+  --color-danger: oklch(0.92 0 0);
+  --color-danger-foreground: oklch(0.10 0 0);
+  --color-warning: oklch(0.92 0 0);
+  --color-warning-foreground: oklch(0.10 0 0);
 }

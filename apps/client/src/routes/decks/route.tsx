@@ -32,8 +32,8 @@ export function DecksPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-foreground mb-6">Decks</h1>
-      <div className="grid grid-cols-[1fr_auto_auto] [&>*:nth-child(n+4)]:border-t [&>*:nth-child(n+4)]:border-border border border-border rounded-lg overflow-hidden">
+      <h1 className="text-lg font-mono font-semibold text-foreground mb-4 tracking-tight">// decks</h1>
+      <div className="grid grid-cols-[1fr_auto_auto] [&>*:nth-child(n+4)]:border-t [&>*:nth-child(n+4)]:border-border border border-border overflow-hidden">
         {decks.map((deck) => (
           <DeckCard
             key={deck.id}

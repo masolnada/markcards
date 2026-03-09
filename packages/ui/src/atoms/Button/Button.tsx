@@ -10,11 +10,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary:   'bg-primary text-primary-foreground hover:bg-primary/85',
-  secondary: 'bg-transparent text-foreground border border-border hover:bg-border/40',
-  success:   'bg-success text-success-foreground hover:bg-success/85',
-  danger:    'bg-danger text-danger-foreground hover:bg-danger/85',
-  ghost:     'bg-transparent text-foreground hover:bg-border/40',
+  primary:   'border border-foreground text-foreground bg-transparent hover:bg-foreground/8 active:translate-y-px',
+  secondary: 'border border-border text-foreground bg-transparent hover:border-foreground hover:bg-foreground/5 active:translate-y-px',
+  success:   'border border-foreground text-foreground bg-transparent hover:bg-foreground/8 active:translate-y-px',
+  danger:    'border border-foreground text-foreground bg-transparent hover:bg-foreground/8 active:translate-y-px',
+  ghost:     'border border-transparent text-foreground bg-transparent hover:border-border hover:bg-foreground/5',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -34,9 +34,9 @@ export function Button({
   return (
     <button
       className={[
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors cursor-pointer',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        'disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex items-center justify-center font-mono font-medium transition-colors cursor-pointer',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground focus-visible:ring-offset-2',
+        'disabled:pointer-events-none disabled:opacity-40',
         variantClasses[variant],
         sizeClasses[size],
         fullWidth ? 'w-full' : '',

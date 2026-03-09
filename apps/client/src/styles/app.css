@@ -2,6 +2,10 @@
 @import '@markcards/ui/tokens';
 @source '../../../../packages/ui/src';
 
+body {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
 /* ── Card content typography ───────────────────────────── */
 .card-content p {
   @apply mb-2 last:mb-0;
@@ -48,8 +52,9 @@
 
 .cloze-shown .cloze-answer {
   display: inline;
-  color: var(--color-success);
+  color: var(--color-foreground);
   font-weight: 600;
+  text-decoration: underline;
 }
 
 /* ── KaTeX display math ────────────────────────────────── */

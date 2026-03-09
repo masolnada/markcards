@@ -9,7 +9,7 @@ interface RatingButtonsProps {
 
 export function RatingButtons({ revealed, onReveal, onPass, onFail }: RatingButtonsProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
       <div className="max-w-3xl mx-auto">
         {!revealed ? (
           <Button variant="secondary" fullWidth size="lg" onClick={onReveal}>
