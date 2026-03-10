@@ -71,6 +71,20 @@ describe('GET /api/review', () => {
     expect(res.body.cards).toHaveLength(5);
     expect(res.body.total).toBe(5);
   });
+
+  it('returns cards in shuffled order across decks', async () => {
+    // Call the endpoint 10 times and collect card-ID sequences.
+    // With 5 cards (120 permutations), getting the same order every time
+    // would have probability (1/120)^9 ≈ 10^-19 — effectively impossible.
+    const orders: string[][] = [];
+    for (let i = 0; i < 10; i++) {
+      const res = await request(app).get('/api/review');
+      orders.push(res.body.cards.map((c: { cardId: string }) => c.cardId));
+    }
+    const first = orders[0].join(',');
+    const allSame = orders.every(o => o.join(',') === first);
+    expect(allSame).toBe(false);
+  });
 });
 
 describe('GET /api/review/:deckId', () => {

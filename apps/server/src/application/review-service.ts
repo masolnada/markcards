@@ -29,6 +29,11 @@ export class ReviewService {
     }
 
     const due = [...reviewCards, ...newCards];
+    // Shuffle so cards from different decks are interleaved (Fisher-Yates)
+    for (let i = due.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [due[i], due[j]] = [due[j], due[i]];
+    }
 
     const rendered: RenderedCard[] = [];
     for (const { cardId, deckId } of due) {
