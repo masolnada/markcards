@@ -10,8 +10,23 @@ export function Icon({ className }: { className?: string }) {
         borderRight: '1.5px solid currentColor',
         borderBottom: '4px solid currentColor',
         flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
       aria-hidden="true"
-    />
+    >
+      <span
+        style={{
+          fontSize: 7,
+          lineHeight: 1,
+          fontWeight: 700,
+          letterSpacing: '-0.5px',
+          userSelect: 'none',
+        }}
+      >
+        M
+      </span>
+    </div>
   );
 }
