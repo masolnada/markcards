@@ -22,6 +22,81 @@ function countBrackets(template: string): number {
   return matches ? matches.length : 0;
 }
 
+function blockCardIds(blockLines: string[]): string[] {
+  const blockText = blockLines.join('\n');
+  const ids: string[] = [];
+
+  const clozeMatch = blockText.match(/^C:\s*([\s\S]+)/);
+  if (clozeMatch) {
+    const template = clozeMatch[1].trim();
+    const count = countBrackets(template);
+    for (let i = 0; i < count; i++) ids.push(clozeCardId(template, i));
+    return ids;
+  }
+
+  if (/^Q:/m.test(blockText)) {
+    let question = '';
+    let answer = '';
+    let mode: 'q' | 'a' | null = null;
+    for (const line of blockLines) {
+      const qMatch = line.match(/^Q:\s*(.*)/);
+      const aMatch = line.match(/^A:\s*(.*)/);
+      if (qMatch) { mode = 'q'; question = qMatch[1]; }
+      else if (aMatch) { mode = 'a'; answer = aMatch[1]; }
+      else if (mode === 'q') question += '\n' + line;
+      else if (mode === 'a') answer += '\n' + line;
+    }
+    question = question.trim();
+    answer = answer.trim();
+    if (question) ids.push(qaCardId(question, answer));
+  }
+
+  return ids;
+}
+
+/** Remove card blocks from deck file content whose generated IDs are in `toRemove`. */
+export function removeCardBlocks(content: string, toRemove: Set<string>): string {
+  let frontmatter = '';
+  let body = content;
+  if (content.startsWith('---')) {
+    const end = content.indexOf('\n---', 3);
+    if (end !== -1) {
+      frontmatter = content.slice(0, end + 4);
+      body = content.slice(end + 4);
+    }
+  }
+
+  const lines = body.replace(/\r\n/g, '\n').split('\n');
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  let inQBlock = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === '---') {
+      if (current.length > 0) blocks.push(current);
+      current = [];
+      inQBlock = false;
+    } else if (trimmed === '') {
+      if (inQBlock) {
+        current.push(line);
+      } else {
+        if (current.length > 0) blocks.push(current);
+        current = [];
+      }
+    } else {
+      if (/^Q:/i.test(trimmed)) inQBlock = true;
+      if (/^A:/i.test(trimmed)) inQBlock = false;
+      current.push(line);
+    }
+  }
+  if (current.length > 0) blocks.push(current);
+
+  const kept = blocks.filter(b => !blockCardIds(b).some(id => toRemove.has(id)));
+  const newBody = kept.map(b => b.join('\n')).join('\n\n');
+  return (frontmatter ? frontmatter + '\n\n' + newBody : newBody).trimEnd() + '\n';
+}
+
 export function parseDeck(filePath: string, content: string): Deck {
   const id = deckId(filePath);
   let name = filePath.split('/').pop()?.replace(/\.md$/, '') ?? 'Unnamed Deck';

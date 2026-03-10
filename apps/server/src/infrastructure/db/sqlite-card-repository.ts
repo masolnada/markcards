@@ -124,6 +124,13 @@ export class SqliteCardRepository implements CardRepository {
     return result.c;
   }
 
+  deleteCards(cardIds: string[]): void {
+    if (cardIds.length === 0) return;
+    const placeholders = cardIds.map(() => '?').join(', ');
+    this.db.query(`DELETE FROM review_log WHERE card_id IN (${placeholders})`).run(...cardIds);
+    this.db.query(`DELETE FROM cards WHERE card_id IN (${placeholders})`).run(...cardIds);
+  }
+
   getStats(deckId: string, now: Date): DeckStats {
     const total = this.db.query<{ c: number }, [string]>('SELECT COUNT(*) as c FROM cards WHERE deck_id = ?').get(deckId)!.c;
     const dueReview = this.db.query<{ c: number }, [string, string]>(

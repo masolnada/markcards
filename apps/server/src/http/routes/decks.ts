@@ -16,6 +16,16 @@ export function createDecksRouter(deckService: DeckService, reviewService: Revie
     res.json(result);
   });
 
+  router.delete('/api/decks/:deckId/cards', async (req, res) => {
+    const { cardIds } = req.body as { cardIds?: unknown };
+    if (!Array.isArray(cardIds) || cardIds.some(id => typeof id !== 'string')) {
+      res.status(400).json({ error: 'cardIds must be an array of strings' });
+      return;
+    }
+    await reviewService.deleteCards(req.params.deckId, cardIds as string[]);
+    res.status(204).end();
+  });
+
   router.get('/api/decks/:deckId', async (req, res) => {
     const result = await deckService.getDeck(req.params.deckId, new Date());
     if (!result) {

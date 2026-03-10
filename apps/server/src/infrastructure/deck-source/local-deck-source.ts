@@ -1,6 +1,6 @@
-import { readFileSync, watch, readdirSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, watch, readdirSync, existsSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
-import { parseDeck } from '../parser.js';
+import { parseDeck, removeCardBlocks } from '../parser.js';
 import type { Deck } from '../../domain/card.js';
 import type { DeckSource } from '../../application/ports/deck-source.js';
 import type { CardRepository } from '../../application/ports/card-repository.js';
@@ -20,6 +20,16 @@ export class LocalDeckSource implements DeckSource {
 
   getById(id: string): Deck | undefined {
     return this.registry.get(id);
+  }
+
+  async removeCards(deckId: string, cardIds: string[]): Promise<void> {
+    const deck = this.registry.get(deckId);
+    if (!deck) return;
+    const content = readFileSync(deck.filePath, 'utf8');
+    const updated = removeCardBlocks(content, new Set(cardIds));
+    writeFileSync(deck.filePath, updated, 'utf8');
+    // Reload immediately so the registry is consistent without waiting for fs.watch
+    this.loadFile(deck.filePath);
   }
 
   async sync(_force = false): Promise<void> {

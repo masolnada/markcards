@@ -13,3 +13,12 @@ export const deckCardsQueryOptions = (deckId: string | null) =>
     },
     enabled: deckId !== null,
   });
+
+export async function deleteDeckCards(deckId: string, cardIds: string[]): Promise<void> {
+  const res = await fetch(`/api/decks/${deckId}/cards`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cardIds }),
+  });
+  if (!res.ok) throw new Error('Failed to delete cards');
+}

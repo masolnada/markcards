@@ -5,9 +5,10 @@ export interface SidePanelProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  footer?: ReactNode;
 }
 
-export function SidePanel({ open, onClose, title, children }: SidePanelProps) {
+export function SidePanel({ open, onClose, title, children, footer }: SidePanelProps) {
   return (
     <>
       {/* Backdrop — mobile only, fades with the panel */}
@@ -42,6 +43,13 @@ export function SidePanel({ open, onClose, title, children }: SidePanelProps) {
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
           {children}
         </div>
+
+        {/* Footer */}
+        {footer && (
+          <div className="shrink-0 border-t border-border px-3 py-2">
+            {footer}
+          </div>
+        )}
       </div>
     </>
   );

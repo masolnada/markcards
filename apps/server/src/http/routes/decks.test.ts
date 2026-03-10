@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import os from 'os';
 import { Database } from 'bun:sqlite';
@@ -64,6 +64,104 @@ describe('GET /api/decks', () => {
     for (const deck of res.body) {
       expect(deck.stats.due).toBe(deck.stats.total);
     }
+  });
+});
+
+describe('DELETE /api/decks/:deckId/cards', () => {
+  it('returns 400 when cardIds is missing', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckA = decks.find((d: { name: string }) => d.name === 'deck-a');
+
+    const res = await request(app)
+      .delete(`/api/decks/${deckA.id}/cards`)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when cardIds is not an array of strings', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckA = decks.find((d: { name: string }) => d.name === 'deck-a');
+
+    const res = await request(app)
+      .delete(`/api/decks/${deckA.id}/cards`)
+      .send({ cardIds: [42] });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 204 and removes card from SQLite', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckA = decks.find((d: { name: string }) => d.name === 'deck-a');
+
+    const cardsRes = await request(app).get(`/api/decks/${deckA.id}/cards`);
+    const [first] = cardsRes.body.cards;
+
+    const res = await request(app)
+      .delete(`/api/decks/${deckA.id}/cards`)
+      .send({ cardIds: [first.cardId] });
+    expect(res.status).toBe(204);
+
+    // Force re-sync so deck-source reloads from (now-modified) file
+    await deckSource.sync(true);
+
+    const afterRes = await request(app).get(`/api/decks/${deckA.id}/cards`);
+    const remainingIds = afterRes.body.cards.map((c: { cardId: string }) => c.cardId);
+    expect(remainingIds).not.toContain(first.cardId);
+    expect(afterRes.body.cards).toHaveLength(1);
+  });
+
+  it('rewrites the markdown file removing the deleted card block', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckA = decks.find((d: { name: string }) => d.name === 'deck-a');
+
+    const cardsRes = await request(app).get(`/api/decks/${deckA.id}/cards`);
+    const cardToDelete = cardsRes.body.cards.find(
+      (c: { promptHtml: string }) => c.promptHtml.includes('2+2'),
+    );
+
+    await request(app)
+      .delete(`/api/decks/${deckA.id}/cards`)
+      .send({ cardIds: [cardToDelete.cardId] });
+
+    const fileContent = readFileSync(join(tmpDir, 'deck-a.md'), 'utf8');
+    expect(fileContent).not.toContain('2+2');
+    expect(fileContent).toContain('Capital of France');
+  });
+
+  it('deleted card does not reappear after re-sync', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckA = decks.find((d: { name: string }) => d.name === 'deck-a');
+
+    const cardsRes = await request(app).get(`/api/decks/${deckA.id}/cards`);
+    const [first] = cardsRes.body.cards;
+
+    await request(app)
+      .delete(`/api/decks/${deckA.id}/cards`)
+      .send({ cardIds: [first.cardId] });
+
+    // Re-sync simulates a server restart or watch event
+    await deckSource.sync(true);
+
+    const afterRes = await request(app).get(`/api/decks/${deckA.id}/cards`);
+    expect(afterRes.body.cards).toHaveLength(1);
+    expect(afterRes.body.cards[0].cardId).not.toBe(first.cardId);
+  });
+
+  it('deletes a cloze card block', async () => {
+    const decks = (await request(app).get('/api/decks')).body;
+    const deckB = decks.find((d: { name: string }) => d.name === 'deck-b');
+
+    const cardsRes = await request(app).get(`/api/decks/${deckB.id}/cards`);
+    const clozeCard = cardsRes.body.cards.find(
+      (c: { type: string }) => c.type === 'cloze',
+    );
+
+    await request(app)
+      .delete(`/api/decks/${deckB.id}/cards`)
+      .send({ cardIds: [clozeCard.cardId] });
+
+    const fileContent = readFileSync(join(tmpDir, 'deck-b.md'), 'utf8');
+    expect(fileContent).not.toContain('sun');
+    expect(fileContent).toContain('sky');
   });
 });
 

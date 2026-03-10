@@ -74,6 +74,11 @@ export class ReviewService {
     return { cards: rendered, deck: { id: deck.id, name: deck.name } };
   }
 
+  async deleteCards(deckId: string, cardIds: string[]): Promise<void> {
+    this.cards.deleteCards(cardIds);
+    await this.decks.removeCards(deckId, cardIds);
+  }
+
   submitReview(cardId: string, pass: boolean, now: Date): { nextDue: string; scheduledDays: number; state: number; rating: number } | null {
     const card = this.cards.findById(cardId);
     if (!card) return null;

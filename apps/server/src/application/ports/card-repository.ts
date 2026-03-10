@@ -18,4 +18,5 @@ export interface CardRepository {
   getNewIdsForDeckQueue(deckId: string, now: Date, limit?: number): { cardId: string; deckId: string }[];
   countNewReviewedTodayForDeck(deckId: string, now: Date): number;
   getStats(deckId: string, now: Date): DeckStats;
+  deleteCards(cardIds: string[]): void;
 }

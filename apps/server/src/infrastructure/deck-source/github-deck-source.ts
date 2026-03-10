@@ -1,4 +1,4 @@
-import { parseDeck } from '../parser.js';
+import { parseDeck, removeCardBlocks } from '../parser.js';
 import type { Deck } from '../../domain/card.js';
 import type { DeckSource } from '../../application/ports/deck-source.js';
 import type { CardRepository } from '../../application/ports/card-repository.js';
@@ -86,6 +86,43 @@ export class GithubDeckSource implements DeckSource {
 
   getById(id: string): Deck | undefined {
     return this.registry.get(id);
+  }
+
+  async removeCards(deckId: string, cardIds: string[]): Promise<void> {
+    const deck = this.registry.get(deckId);
+    if (!deck) return;
+
+    // virtualPath is "github:owner/repo/path/to/file.md"
+    const filePath = deck.filePath.replace(/^github:[^/]+\/[^/]+\//, '');
+    const { owner, repo, branch, token } = this.cfg;
+    const headers = buildHeaders(token);
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
+
+    const getRes = await fetch(url, { headers });
+    if (!getRes.ok) throw new Error(`GitHub GET failed: ${getRes.status}`);
+    const data = await getRes.json() as { content: string; sha: string };
+    const currentContent = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8');
+
+    const updated = removeCardBlocks(currentContent, new Set(cardIds));
+
+    const putRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Remove ${cardIds.length} card(s) from ${filePath}`,
+          content: Buffer.from(updated).toString('base64'),
+          sha: data.sha,
+          branch,
+        }),
+      },
+    );
+    if (!putRes.ok) throw new Error(`GitHub PUT failed: ${putRes.status}`);
+
+    // Update in-memory registry with the new content
+    const updatedDeck = parseDeck(deck.filePath, updated);
+    this.registry.set(updatedDeck.id, updatedDeck);
   }
 
   async sync(force = false): Promise<void> {
