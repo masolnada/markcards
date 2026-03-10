@@ -248,7 +248,7 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
 
     // Drag support
     let dragging: GraphNode | null = null;
-    let dragStartPos: { x: number; y: number } | null = null;
+    let hasDragged = false;
 
     function getPos(e: PointerEvent): { x: number; y: number } {
       const rect = svg.getBoundingClientRect();
@@ -258,42 +258,47 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
     nodeEls.forEach((circle, i) => {
       const node = nodes[i];
       if (node.kind === 'root') return;
+
+      let startPos: { x: number; y: number } | null = null;
+
       circle.addEventListener('pointerdown', (e: PointerEvent) => {
         e.preventDefault();
         dragging = node;
-        dragStartPos = getPos(e);
+        hasDragged = false;
+        startPos = getPos(e);
         dragging.fx = dragging.x;
         dragging.fy = dragging.y;
-        if (!(onDeckClick && node.kind === 'deck')) {
-          circle.setAttribute('cursor', 'grabbing');
-        }
         circle.setPointerCapture(e.pointerId);
         sim.alphaTarget(0.3).restart();
       });
       circle.addEventListener('pointermove', (e: PointerEvent) => {
         if (dragging !== node) return;
         const pos = getPos(e);
+        if (!hasDragged && startPos) {
+          const dx = pos.x - startPos.x;
+          const dy = pos.y - startPos.y;
+          if (Math.sqrt(dx * dx + dy * dy) > 10) hasDragged = true;
+        }
         dragging.fx = pos.x;
         dragging.fy = pos.y;
       });
-      circle.addEventListener('pointerup', (e: PointerEvent) => {
+
+      function release() {
         if (dragging !== node) return;
-        const endPos = getPos(e);
-        const dx = endPos.x - (dragStartPos?.x ?? endPos.x);
-        const dy = endPos.y - (dragStartPos?.y ?? endPos.y);
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const wasTap = !hasDragged;
         dragging.fx = null;
         dragging.fy = null;
         dragging = null;
-        dragStartPos = null;
-        if (!(onDeckClick && node.kind === 'deck')) {
-          circle.setAttribute('cursor', 'grab');
-        }
+        startPos = null;
+        hasDragged = false;
         sim.alphaTarget(0);
-        if (dist < 5 && onDeckClick && node.kind === 'deck' && node.deckSummary) {
+        if (wasTap && onDeckClick && node.kind === 'deck' && node.deckSummary) {
           onDeckClick(node.deckSummary);
         }
-      });
+      }
+
+      circle.addEventListener('pointerup', release);
+      circle.addEventListener('pointercancel', release);
     });
 
     // Close panel when clicking SVG background (not a node)
