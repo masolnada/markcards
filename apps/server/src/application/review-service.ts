@@ -66,6 +66,14 @@ export class ReviewService {
     return { cards: rendered, total: rendered.length, deck: { id: deck.id, name: deck.name } };
   }
 
+  async getAllCardsForDeck(deckId: string): Promise<{ cards: RenderedCard[]; deck: { id: string; name: string } } | null> {
+    await this.decks.sync();
+    const deck = this.decks.getById(deckId);
+    if (!deck) return null;
+    const rendered = deck.cards.map(card => this.renderer.render(card, deck));
+    return { cards: rendered, deck: { id: deck.id, name: deck.name } };
+  }
+
   submitReview(cardId: string, pass: boolean, now: Date): { nextDue: string; scheduledDays: number; state: number; rating: number } | null {
     const card = this.cards.findById(cardId);
     if (!card) return null;

@@ -46,9 +46,11 @@ function stripCommonPrefix(paths: string[]): string[] {
 
 interface Props {
   decks: DeckSummary[];
+  onDeckClick?: (deck: DeckSummary) => void;
+  onBackgroundClick?: () => void;
 }
 
-export function SkillsGraph({ decks }: Props) {
+export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -195,7 +197,7 @@ export function SkillsGraph({ decks }: Props) {
         circle.style.fill = 'var(--color-muted-foreground)';
         circle.setAttribute('opacity', '0.4');
       }
-      circle.setAttribute('cursor', n.kind === 'root' ? 'default' : 'grab');
+      circle.setAttribute('cursor', n.kind === 'root' ? 'default' : (onDeckClick && n.kind === 'deck' ? 'pointer' : 'grab'));
       nodeGroup.appendChild(circle);
       return circle;
     });
@@ -246,6 +248,7 @@ export function SkillsGraph({ decks }: Props) {
 
     // Drag support
     let dragging: GraphNode | null = null;
+    let dragStartPos: { x: number; y: number } | null = null;
 
     function getPos(e: PointerEvent): { x: number; y: number } {
       const rect = svg.getBoundingClientRect();
@@ -258,9 +261,12 @@ export function SkillsGraph({ decks }: Props) {
       circle.addEventListener('pointerdown', (e: PointerEvent) => {
         e.preventDefault();
         dragging = node;
+        dragStartPos = getPos(e);
         dragging.fx = dragging.x;
         dragging.fy = dragging.y;
-        circle.setAttribute('cursor', 'grabbing');
+        if (!(onDeckClick && node.kind === 'deck')) {
+          circle.setAttribute('cursor', 'grabbing');
+        }
         circle.setPointerCapture(e.pointerId);
         sim.alphaTarget(0.3).restart();
       });
@@ -270,20 +276,37 @@ export function SkillsGraph({ decks }: Props) {
         dragging.fx = pos.x;
         dragging.fy = pos.y;
       });
-      circle.addEventListener('pointerup', () => {
+      circle.addEventListener('pointerup', (e: PointerEvent) => {
         if (dragging !== node) return;
+        const endPos = getPos(e);
+        const dx = endPos.x - (dragStartPos?.x ?? endPos.x);
+        const dy = endPos.y - (dragStartPos?.y ?? endPos.y);
+        const dist = Math.sqrt(dx * dx + dy * dy);
         dragging.fx = null;
         dragging.fy = null;
         dragging = null;
-        circle.setAttribute('cursor', 'grab');
+        dragStartPos = null;
+        if (!(onDeckClick && node.kind === 'deck')) {
+          circle.setAttribute('cursor', 'grab');
+        }
         sim.alphaTarget(0);
+        if (dist < 5 && onDeckClick && node.kind === 'deck' && node.deckSummary) {
+          onDeckClick(node.deckSummary);
+        }
       });
     });
 
+    // Close panel when clicking SVG background (not a node)
+    const handleSvgClick = (e: MouseEvent) => {
+      if (e.target === svg) onBackgroundClick?.();
+    };
+    svg.addEventListener('click', handleSvgClick);
+
     return () => {
       sim.stop();
+      svg.removeEventListener('click', handleSvgClick);
     };
-  }, [decks]);
+  }, [decks, onDeckClick, onBackgroundClick]);
 
   return (
     <svg

@@ -31,6 +31,7 @@ body {
 .card-content img {
   @apply block mx-auto max-w-full;
 }
+.card-summary-content img { max-height: 80px; width: auto; display: inline-block; }
 
 /* ── Cloze card styles ─────────────────────────────────── */
 .cloze-blank {

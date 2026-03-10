@@ -17,3 +17,8 @@ export type { SpinnerProps, SpinnerSize } from './atoms/Spinner';
 
 export { Icon } from './atoms/Icon';
 
+// Molecules
+export { SidePanel } from './molecules/SidePanel';
+export type { SidePanelProps } from './molecules/SidePanel';
+export { CardSummary } from './molecules/CardSummary';
+export type { CardSummaryProps } from './molecules/CardSummary';

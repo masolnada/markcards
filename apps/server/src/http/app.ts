@@ -22,7 +22,7 @@ export function createApp(
   const app = express();
   app.use(express.json());
 
-  app.use(createDecksRouter(deckService));
+  app.use(createDecksRouter(deckService, reviewService));
   app.use(createReviewRouter(reviewService));
 
   app.use('/decks', express.static(decksDir));
