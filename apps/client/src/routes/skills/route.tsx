@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Spinner, SidePanel, CardSummary } from '@markcards/ui';
 import type { DeckSummary } from '@markcards/types';
@@ -9,6 +9,7 @@ import { SkillsGraph } from './SkillsGraph';
 
 export function SkillsPage() {
   const [selectedDeck, setSelectedDeck] = useState<DeckSummary | null>(null);
+  const clearSelectedDeck = useCallback(() => setSelectedDeck(null), []);
   const { data: decks, isLoading, error } = useQuery(decksQueryOptions);
   const { data: deckCards, isLoading: cardsLoading } = useQuery(
     deckCardsQueryOptions(selectedDeck?.id ?? null),
@@ -48,13 +49,13 @@ export function SkillsPage() {
         <SkillsGraph
           decks={decks}
           onDeckClick={setSelectedDeck}
-          onBackgroundClick={() => setSelectedDeck(null)}
+          onBackgroundClick={clearSelectedDeck}
         />
       </div>
 
       <SidePanel
         open={selectedDeck !== null}
-        onClose={() => setSelectedDeck(null)}
+        onClose={clearSelectedDeck}
         title={deckCards?.deck.name ?? selectedDeck?.name ?? ''}
       >
         {cardsLoading ? (
