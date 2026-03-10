@@ -40,10 +40,11 @@ export function SkillsPage() {
     <>
       <div
         style={{
-          marginLeft: 'calc(50% - 50vw)',
-          marginRight: 'calc(50% - 50vw)',
-          marginTop: '-2rem',
-          height: 'calc(100vh - 3.5rem)',
+          position: 'fixed',
+          top: '3rem',
+          left: 0,
+          right: 0,
+          bottom: 0,
         }}
       >
         <SkillsGraph
