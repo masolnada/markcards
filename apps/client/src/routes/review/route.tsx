@@ -43,16 +43,14 @@ export function ReviewPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!revealed) {
-        if (e.key === ' ') {
+        if (e.key === ' ' || e.key === '2' || e.key === 'ArrowRight' || e.key === '1' || e.key === 'ArrowLeft') {
           e.preventDefault();
           setReveal(true);
         }
       } else {
-        if (e.key === 'ArrowLeft' || e.key === 'h' || e.key === 'j') {
+        if (e.key === '1' || e.key === 'ArrowLeft') {
           handleRate(false);
-        } else if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'k') {
-          handleRate(true);
-        } else if (e.key === ' ') {
+        } else if (e.key === '2' || e.key === ' ' || e.key === 'ArrowRight') {
           e.preventDefault();
           handleRate(true);
         }
