@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch, Link } from '@tanstack/react-router';
 import { Spinner, ProgressBar, Button } from '@markcards/ui';
 import { EmptyState } from '../../_shared/EmptyState';
 import { StatGroup } from '../../_shared/StatGroup';
 import { reviewQueryOptions, submitReview } from '../../api/review';
+import { suspendCard } from '../../api/suspended';
+import { useHelp } from '../root/HelpProvider';
 import { FlashCard } from './FlashCard';
 import { RatingButtons } from './RatingButtons';
 
@@ -17,12 +19,15 @@ interface SessionStats {
 export function ReviewPage() {
   const { deck: deckId } = useSearch({ from: '/review' });
   const { data: queue, isLoading, error } = useQuery(reviewQueryOptions(deckId));
+  const help = useHelp();
 
+  const queryClient = useQueryClient();
   const [index, setIndex] = useState(0);
   const [revealed, setReveal] = useState(false);
   const [stats, setStats] = useState<SessionStats>({ reviewed: 0, passed: 0, failed: 0 });
+  const [suspendedIds, setSuspendedIds] = useState<Set<string>>(new Set());
 
-  const cards = queue?.cards ?? [];
+  const cards = (queue?.cards ?? []).filter(c => !suspendedIds.has(c.cardId));
   const card = cards[index];
 
   const handleRate = useCallback(
@@ -40,8 +45,22 @@ export function ReviewPage() {
     [card],
   );
 
+  const handleSuspend = useCallback(() => {
+    if (!card) return;
+    suspendCard(card.cardId); // fire-and-forget
+    queryClient.invalidateQueries({ queryKey: ['suspended'] });
+    queryClient.invalidateQueries({ queryKey: ['decks'] });
+    setSuspendedIds(prev => new Set(prev).add(card.cardId));
+    setReveal(false);
+  }, [card, queryClient]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (help.open) return;
+      if (e.key === 's' || e.key === 'S') {
+        handleSuspend();
+        return;
+      }
       if (!revealed) {
         if (e.key === ' ' || e.key === '2' || e.key === 'ArrowRight' || e.key === '1' || e.key === 'ArrowLeft') {
           e.preventDefault();
@@ -58,7 +77,7 @@ export function ReviewPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [revealed, handleRate]);
+  }, [revealed, help.open, handleRate, handleSuspend]);
 
   if (isLoading) {
     return (
@@ -116,6 +135,7 @@ export function ReviewPage() {
         onReveal={() => setReveal(true)}
         onPass={() => handleRate(true)}
         onFail={() => handleRate(false)}
+        onSuspend={handleSuspend}
       />
     </div>
   );
