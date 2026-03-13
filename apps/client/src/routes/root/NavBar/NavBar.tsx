@@ -56,6 +56,12 @@ export function NavBar() {
             markcards
           </Link>
           <Link
+            to="/suspended"
+            className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:underline [&.active]:underline-offset-4"
+          >
+            suspended
+          </Link>
+          <Link
             to="/review"
             search={{ deck: undefined }}
             className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:underline [&.active]:underline-offset-4"

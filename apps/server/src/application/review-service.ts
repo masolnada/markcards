@@ -79,6 +79,24 @@ export class ReviewService {
     return { cards: rendered, deck: { id: deck.id, name: deck.name } };
   }
 
+  setSuspended(cardId: string, suspended: boolean): void {
+    this.cards.setSuspended(cardId, suspended);
+  }
+
+  async getSuspendedCards(): Promise<{ cards: RenderedCard[] }> {
+    await this.decks.sync();
+    const ids = this.cards.getSuspendedIds();
+    const rendered: RenderedCard[] = [];
+    for (const { cardId, deckId } of ids) {
+      const deck = this.decks.getById(deckId);
+      if (!deck) continue;
+      const card = deck.cards.find(c => c.id === cardId);
+      if (!card) continue;
+      rendered.push(this.renderer.render(card, deck));
+    }
+    return { cards: rendered };
+  }
+
   async deleteCards(deckId: string, cardIds: string[]): Promise<void> {
     this.cards.deleteCards(cardIds);
     await this.decks.removeCards(deckId, cardIds);

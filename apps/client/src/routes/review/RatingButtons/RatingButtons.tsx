@@ -5,6 +5,7 @@ interface RatingButtonsProps {
   onReveal: () => void;
   onPass: () => void;
   onFail: () => void;
+  onSuspend: () => void;
 }
 
 export function RatingButtons({ revealed, onReveal, onPass, onFail }: RatingButtonsProps) {

@@ -8,6 +8,7 @@ import { RootLayout } from './routes/root/route';
 import { DecksPage } from './routes/decks/route';
 import { ReviewPage } from './routes/review/route';
 import { SkillsPage } from './routes/skills/route';
+import { SuspendedPage } from './routes/suspended/route';
 
 const rootRoute = createRootRoute({ component: RootLayout });
 
@@ -40,7 +41,13 @@ const skillsRoute = createRoute({
   component: SkillsPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, decksRoute, reviewRoute, skillsRoute]);
+const suspendedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/suspended',
+  component: SuspendedPage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, decksRoute, reviewRoute, skillsRoute, suspendedRoute]);
 
 export const router = createRouter({ routeTree });
 

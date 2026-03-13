@@ -12,6 +12,7 @@ import { DeckService } from '../application/deck-service.js';
 import { ReviewService } from '../application/review-service.js';
 import { createDecksRouter } from './routes/decks.js';
 import { createReviewRouter } from './routes/review.js';
+import { createSuspendedRouter } from './routes/suspended.js';
 import type { Express } from 'express';
 
 export function createApp(
@@ -24,6 +25,7 @@ export function createApp(
 
   app.use(createDecksRouter(deckService, reviewService));
   app.use(createReviewRouter(reviewService));
+  app.use(createSuspendedRouter(reviewService));
 
   app.use('/decks', express.static(decksDir));
 

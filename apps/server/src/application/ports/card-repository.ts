@@ -7,6 +7,7 @@ export interface DeckStats {
   newCards: number;
   relearning: number;
   shortReview: number;
+  suspended: number;
 }
 
 export interface CardRepository {
@@ -19,4 +20,6 @@ export interface CardRepository {
   countNewReviewedTodayForDeck(deckId: string, now: Date): number;
   getStats(deckId: string, now: Date): DeckStats;
   deleteCards(cardIds: string[]): void;
+  setSuspended(cardId: string, suspended: boolean): void;
+  getSuspendedIds(): { cardId: string; deckId: string }[];
 }

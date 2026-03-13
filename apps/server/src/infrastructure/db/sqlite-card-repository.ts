@@ -83,14 +83,14 @@ export class SqliteCardRepository implements CardRepository {
 
   getDueReviewIds(now: Date): { cardId: string; deckId: string }[] {
     const rows = this.db.query<{ card_id: string; deck_id: string }, [string]>(
-      `SELECT card_id, deck_id FROM cards WHERE state > 0 AND due <= ? ORDER BY due ASC`
+      `SELECT card_id, deck_id FROM cards WHERE state > 0 AND suspended = 0 AND due <= ? ORDER BY due ASC`
     ).all(now.toISOString());
     return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
   }
 
   getDueReviewIdsForDeck(deckId: string, now: Date): { cardId: string; deckId: string }[] {
     const rows = this.db.query<{ card_id: string }, [string, string]>(
-      `SELECT card_id FROM cards WHERE deck_id = ? AND state > 0 AND due <= ? ORDER BY due ASC`
+      `SELECT card_id FROM cards WHERE deck_id = ? AND state > 0 AND suspended = 0 AND due <= ? ORDER BY due ASC`
     ).all(deckId, now.toISOString());
     return rows.map(r => ({ cardId: r.card_id, deckId }));
   }
@@ -99,12 +99,12 @@ export class SqliteCardRepository implements CardRepository {
     if (limit !== undefined && limit <= 0) return [];
     if (limit !== undefined) {
       const rows = this.db.query<{ card_id: string }, [string, string, number]>(
-        `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
+        `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND suspended = 0 AND due <= ? ORDER BY due ASC LIMIT ?`
       ).all(deckId, now.toISOString(), limit);
       return rows.map(r => ({ cardId: r.card_id, deckId }));
     }
     const rows = this.db.query<{ card_id: string }, [string, string]>(
-      `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND due <= ? ORDER BY due ASC`
+      `SELECT card_id FROM cards WHERE deck_id = ? AND state = 0 AND suspended = 0 AND due <= ? ORDER BY due ASC`
     ).all(deckId, now.toISOString());
     return rows.map(r => ({ cardId: r.card_id, deckId }));
   }
@@ -134,21 +134,35 @@ export class SqliteCardRepository implements CardRepository {
   getStats(deckId: string, now: Date): DeckStats {
     const total = this.db.query<{ c: number }, [string]>('SELECT COUNT(*) as c FROM cards WHERE deck_id = ?').get(deckId)!.c;
     const dueReview = this.db.query<{ c: number }, [string, string]>(
-      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state > 0 AND due <= ?`
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state > 0 AND suspended = 0 AND due <= ?`
     ).get(deckId, now.toISOString())!.c;
     const dueNew = this.db.query<{ c: number }, [string, string]>(
-      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0 AND due <= ?`
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0 AND suspended = 0 AND due <= ?`
     ).get(deckId, now.toISOString())!.c;
     const due = dueReview + dueNew;
     const newCards = this.db.query<{ c: number }, [string]>(
-      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0`
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 0 AND suspended = 0`
     ).get(deckId)!.c;
     const relearning = this.db.query<{ c: number }, [string]>(
-      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 3`
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 3 AND suspended = 0`
     ).get(deckId)!.c;
     const shortReview = this.db.query<{ c: number }, [string]>(
-      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 2 AND scheduled_days <= 7`
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND state = 2 AND suspended = 0 AND scheduled_days <= 7`
     ).get(deckId)!.c;
-    return { total, due, newCards, relearning, shortReview };
+    const suspended = this.db.query<{ c: number }, [string]>(
+      `SELECT COUNT(*) as c FROM cards WHERE deck_id = ? AND suspended = 1`
+    ).get(deckId)!.c;
+    return { total, due, newCards, relearning, shortReview, suspended };
+  }
+
+  setSuspended(cardId: string, suspended: boolean): void {
+    this.db.query('UPDATE cards SET suspended = ? WHERE card_id = ?').run(suspended ? 1 : 0, cardId);
+  }
+
+  getSuspendedIds(): { cardId: string; deckId: string }[] {
+    const rows = this.db.query<{ card_id: string; deck_id: string }, []>(
+      'SELECT card_id, deck_id FROM cards WHERE suspended = 1 ORDER BY created_at ASC'
+    ).all();
+    return rows.map(r => ({ cardId: r.card_id, deckId: r.deck_id }));
   }
 }

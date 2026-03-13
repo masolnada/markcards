@@ -18,7 +18,8 @@ export function initDb(db: Database): void {
       lapses         INTEGER NOT NULL DEFAULT 0,
       state          INTEGER NOT NULL DEFAULT 0,
       last_review    TEXT,
-      created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+      created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+      suspended      INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS review_log (
@@ -32,4 +33,10 @@ export function initDb(db: Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_cards_deck_due ON cards(deck_id, due);
   `);
+
+  // Migration: add suspended column if absent
+  const cols = db.query<{ name: string }, []>('PRAGMA table_info(cards)').all();
+  if (!cols.some(c => c.name === 'suspended')) {
+    db.exec('ALTER TABLE cards ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0');
+  }
 }

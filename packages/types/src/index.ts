@@ -6,6 +6,7 @@ export interface DeckStats {
   newCards: number;
   relearning: number;
   shortReview: number;
+  suspended: number;
 }
 
 export interface DeckSummary {

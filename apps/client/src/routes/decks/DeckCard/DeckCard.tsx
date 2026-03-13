@@ -16,6 +16,9 @@ export function DeckCard({ deck, onReview }: DeckCardProps) {
         {deck.stats.newCards > 0 && (
           <Badge variant="primary">{deck.stats.newCards} new</Badge>
         )}
+        {deck.stats.suspended > 0 && (
+          <Badge variant="neutral">{deck.stats.suspended} suspended</Badge>
+        )}
       </div>
 
       <div className="bg-card px-4 py-3 flex items-center justify-end">
