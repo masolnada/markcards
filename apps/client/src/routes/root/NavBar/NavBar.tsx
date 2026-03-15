@@ -56,6 +56,12 @@ export function NavBar() {
             markcards
           </Link>
           <Link
+            to="/input"
+            className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:underline [&.active]:underline-offset-4"
+          >
+            input
+          </Link>
+          <Link
             to="/suspended"
             className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:underline [&.active]:underline-offset-4"
           >

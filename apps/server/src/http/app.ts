@@ -13,12 +13,15 @@ import { ReviewService } from '../application/review-service.js';
 import { createDecksRouter } from './routes/decks.js';
 import { createReviewRouter } from './routes/review.js';
 import { createSuspendedRouter } from './routes/suspended.js';
+import { createInputRouter } from './routes/input.js';
+import { InputService } from '../application/input-service.js';
 import type { Express } from 'express';
 
 export function createApp(
   deckService: DeckService,
   reviewService: ReviewService,
   decksDir: string = config.decksDir,
+  inputService?: InputService,
 ): Express {
   const app = express();
   app.use(express.json());
@@ -26,6 +29,9 @@ export function createApp(
   app.use(createDecksRouter(deckService, reviewService));
   app.use(createReviewRouter(reviewService));
   app.use(createSuspendedRouter(reviewService));
+  if (inputService) {
+    app.use(createInputRouter(inputService));
+  }
 
   app.use('/decks', express.static(decksDir));
 
@@ -57,7 +63,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const deckService = new DeckService(deckSource, cardRepo);
   const reviewService = new ReviewService(cardRepo, deckSource, settingsRepo, renderer);
-  const app = createApp(deckService, reviewService);
+
+  let inputService: InputService | undefined;
+  if (config.githubRepo && config.githubToken) {
+    const [owner, repo] = config.githubRepo.split('/');
+    inputService = new InputService({
+      owner,
+      repo,
+      branch: config.githubBranch,
+      token: config.githubToken,
+      basePath: config.githubPath,
+    });
+  }
+
+  const app = createApp(deckService, reviewService, config.decksDir, inputService);
 
   if (config.githubRepo) {
     deckSource.sync(true).then(() => {
