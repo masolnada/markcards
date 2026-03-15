@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Spinner, Button } from '@markcards/ui';
+import { Spinner, Button, EditableCardSummary } from '@markcards/ui';
 import { EmptyState } from '../../_shared/EmptyState';
 import { inputQueryOptions, confirmCard, rejectCard } from '../../api/input';
 import type { InputCard } from '@markcards/types';
@@ -32,12 +32,7 @@ function InputCardItem({ card, onDone }: { card: InputCard; onDone: () => void }
   return (
     <div className="border border-border p-4 flex flex-col gap-3 bg-card">
       <div className="text-xs text-muted-foreground font-mono">{card.destPath}</div>
-      <textarea
-        className="w-full font-mono text-sm bg-background text-foreground border border-border p-2 resize-y min-h-[100px] focus:outline-none focus:border-foreground"
-        value={editedMarkdown}
-        onChange={e => setEditedMarkdown(e.target.value)}
-        disabled={loading}
-      />
+      <EditableCardSummary rawMarkdown={editedMarkdown} onMarkdownChange={setEditedMarkdown} />
       <div className="flex gap-2">
         <Button variant="primary" size="sm" onClick={handleConfirm} disabled={loading}>
           Confirm
