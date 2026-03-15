@@ -15,7 +15,7 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GEMINI_API_KEY,
 });
 
-const MODEL = 'gemini-2.5-pro-preview-05-06';
+const MODEL = 'gemini-2.5-pro';
 
 const CLASSIFY_SYSTEM_PROMPT = `Identify all distinct subjects/topics covered in the input. Output ONLY valid JSON array (no markdown fences):
 [
