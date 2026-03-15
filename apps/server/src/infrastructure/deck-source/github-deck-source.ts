@@ -42,6 +42,7 @@ async function fetchGitHubDecks(cfg: GitHubConfig): Promise<GitHubFile[]> {
     if (item.type !== 'blob') return false;
     if (!item.path.endsWith('.md')) return false;
     if (pathPrefix && !item.path.startsWith(pathPrefix + '/') && item.path !== pathPrefix) return false;
+    if (item.path.includes('/(input)/')) return false;
     return true;
   });
 

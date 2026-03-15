@@ -38,3 +38,9 @@ export interface ReviewResult {
   scheduledDays: number;
   state: number;
 }
+
+export interface InputCard {
+  id: string;
+  destPath: string;
+  rawMarkdown: string;
+}
