@@ -75,6 +75,34 @@ export async function appendOrCreateFile(
   return { url: data.commit.html_url, created };
 }
 
+export async function uploadFile(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  filePath: string,
+  content: ArrayBuffer,
+): Promise<void> {
+  const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath}`;
+  const hdrs = headers(token);
+
+  const getRes = await fetch(`${url}?ref=${branch}`, { headers: hdrs });
+  let sha: string | undefined;
+  if (getRes.ok) {
+    sha = ((await getRes.json()) as { sha: string }).sha;
+  }
+
+  const body: Record<string, string> = {
+    message: `Add ${filePath}`,
+    content: Buffer.from(content).toString('base64'),
+    branch,
+  };
+  if (sha) body.sha = sha;
+
+  const putRes = await fetch(url, { method: 'PUT', headers: hdrs, body: JSON.stringify(body) });
+  if (!putRes.ok) throw new Error(`GitHub PUT failed: ${putRes.status} ${await putRes.text()}`);
+}
+
 export async function appendToInputFile(
   owner: string,
   repo: string,

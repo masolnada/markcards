@@ -1,6 +1,6 @@
 import { Bot } from 'grammy';
-import { classify, generateCards, type Source } from './agent.js';
-import { getFileContent, appendToInputFile } from './github.js';
+import { classify, generateCards, analyzeImage, type Source, type ImageAnalysis } from './agent.js';
+import { getFileContent, appendToInputFile, uploadFile } from './github.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) throw new Error('TELEGRAM_BOT_TOKEN is required');
@@ -65,6 +65,37 @@ async function sendGeneratedCards(chatId: number, source: Source, placeholder: {
   await bot.api.sendMessage(chatId, `Added ${blocks.length} card${blocks.length === 1 ? '' : 's'} to input`);
 }
 
+async function sendPlantCards(
+  chatId: number,
+  imageBuffer: ArrayBuffer,
+  plant: Extract<ImageAnalysis, { type: 'plant' }>,
+  placeholder: { message_id: number },
+): Promise<void> {
+  const filename = plant.latinName.toLowerCase().replace(/\s+/g, '-') + '.jpg';
+  const imagePath = `${githubBasePath}/plants/images/${filename}`;
+  await uploadFile(githubOwner, githubRepo, githubBranch, githubToken, imagePath, imageBuffer);
+
+  const imgRef = `![](images/${filename})`;
+  const blocks: Array<{ path: string; cardMarkdown: string }> = [];
+
+  if (plant.catalanName) {
+    const catalanName = plant.catalanName.charAt(0).toUpperCase() + plant.catalanName.slice(1);
+    blocks.push({
+      path: 'plants/plant-recognition.md',
+      cardMarkdown: `Q: Nom en **Català**?\n\n${imgRef}\nA: ${catalanName}.`,
+    });
+  }
+
+  blocks.push({
+    path: 'plants/plant-recognition.md',
+    cardMarkdown: `Q: Nom en **Llatí**?\n\n${imgRef}\nA: *${plant.latinName}*.`,
+  });
+
+  await appendToInputFile(githubOwner, githubRepo, githubBranch, githubToken, githubBasePath, blocks);
+  await bot.api.deleteMessage(chatId, placeholder.message_id);
+  await bot.api.sendMessage(chatId, `Added ${blocks.length} plant card${blocks.length === 1 ? '' : 's'} to input`);
+}
+
 const bot = new Bot(token);
 
 bot.on('message:photo', async (ctx) => {
@@ -77,12 +108,18 @@ bot.on('message:photo', async (ctx) => {
   const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
   const imageBuffer = await fetch(fileUrl).then((r) => r.arrayBuffer());
 
-  const source: Source = { type: 'image', imageBuffer, caption: ctx.message.caption };
-  lastImages.set(userId, { imageBuffer, caption: ctx.message.caption });
+  const caption = ctx.message.caption;
+  const source: Source = { type: 'image', imageBuffer, caption };
+  lastImages.set(userId, { imageBuffer, caption });
 
   const placeholder = await ctx.reply('Generating cards...');
   try {
-    await sendGeneratedCards(chatId, source, placeholder);
+    const analysis = await analyzeImage(imageBuffer, caption);
+    if (analysis.type === 'plant') {
+      await sendPlantCards(chatId, imageBuffer, analysis, placeholder);
+    } else {
+      await sendGeneratedCards(chatId, source, placeholder);
+    }
   } catch (err) {
     console.error(err);
     await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
