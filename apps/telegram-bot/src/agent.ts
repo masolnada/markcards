@@ -15,7 +15,7 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GEMINI_API_KEY,
 });
 
-const MODEL = 'gemini-3.1-pro-preview';
+const MODEL = 'gemini-2.5-pro-preview-05-06';
 
 const CLASSIFY_SYSTEM_PROMPT = `Identify all distinct subjects/topics covered in the input. Output ONLY valid JSON array (no markdown fences):
 [
@@ -57,7 +57,7 @@ function sourceToContent(source: Source, extraText?: string): Array<ImagePart | 
 
   if (source.type === 'image') {
     return [
-      { type: 'image', image: new Uint8Array(source.imageBuffer), mimeType: 'image/jpeg' },
+      { type: 'image', image: new Uint8Array(source.imageBuffer), mediaType: 'image/jpeg' },
       { type: 'text', text: text || 'Process this image.' },
     ];
   }
@@ -73,6 +73,38 @@ export async function classify(
     messages: [{ role: 'user', content: sourceToContent(source) }],
   });
   return parseJsonArray(text);
+}
+
+const ANALYZE_IMAGE_SYSTEM_PROMPT = `Classify the image. If it contains a plant, identify it. Output ONLY valid JSON (no markdown fences):
+- If plant: { "type": "plant", "latinName": "Genus species", "catalanName": "nom comú en català or null" }
+- Otherwise: { "type": "other" }
+Rules:
+- latinName: full scientific binomial name (e.g. "Rosa canina"). Required when type is "plant".
+- catalanName: common name in Catalan. Use null if no established Catalan name exists.`;
+
+export type ImageAnalysis =
+  | { type: 'plant'; latinName: string; catalanName: string | null }
+  | { type: 'other' };
+
+export async function analyzeImage(
+  imageBuffer: ArrayBuffer,
+  caption?: string,
+): Promise<ImageAnalysis> {
+  const { text } = await generateText({
+    model: google(MODEL),
+    system: ANALYZE_IMAGE_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', image: new Uint8Array(imageBuffer), mediaType: 'image/jpeg' },
+          { type: 'text', text: caption ?? 'Classify this image.' },
+        ],
+      },
+    ],
+  });
+  const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+  return JSON.parse(cleaned) as ImageAnalysis;
 }
 
 export async function generateCards(
