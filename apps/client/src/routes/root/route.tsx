@@ -5,8 +5,7 @@ import { NavBar } from './NavBar';
 
 export function RootLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const route =
-    pathname === '/review' ? 'review' : pathname === '/suspended' ? 'suspended' : 'other';
+  const route = pathname === '/review' ? 'review' : 'other';
 
   return (
     <HelpProvider>

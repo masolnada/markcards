@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { HelpProvider } from '../HelpProvider';
 import { HelpOverlay } from './HelpOverlay';
 
-function renderWithHelp(route: 'review' | 'suspended' | 'other') {
+function renderWithHelp(route: 'review' | 'other') {
   render(
     <HelpProvider>
       <HelpOverlay route={route} />
@@ -23,13 +23,6 @@ describe('HelpOverlay', () => {
     expect(screen.getByText('Show answer / Pass (Good)')).toBeInTheDocument();
     expect(screen.getByText('Fail (Again)')).toBeInTheDocument();
     expect(screen.getByText('Suspend card')).toBeInTheDocument();
-  });
-
-  it('suspended route: renders unsuspend shortcut, not suspend', async () => {
-    renderWithHelp('suspended');
-    await openPanel();
-    expect(screen.getByText('Unsuspend hovered card')).toBeInTheDocument();
-    expect(screen.queryByText('Suspend card')).not.toBeInTheDocument();
   });
 
   it('other route: renders only toggle/close shortcuts', async () => {
