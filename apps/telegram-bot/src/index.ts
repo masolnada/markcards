@@ -2,6 +2,8 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { classify, generateCards, analyzeImage, type Source, type ImageAnalysis } from './agent.js';
 import { getFileContent, appendToInputFile, uploadFile } from './github.js';
 import { identifyPlant, type PlantResult } from './plantnet.js';
+import { SchedulerManager } from './scheduler.js';
+import { ConfigStore } from './config-store.js';
 
 function isLlmOverloaded(err: unknown): boolean {
   return (
@@ -267,6 +269,61 @@ bot.on('message:text', async (ctx) => {
     console.error(err);
     await ctx.api.editMessageText(chatId, placeholder.message_id, errorMessage(err, 'Something went wrong generating cards.'));
   }
+});
+
+const markcardApiUrl = process.env.MARKCARDS_API_URL;
+const reminderChatId = process.env.REMINDER_CHAT_ID ? Number(process.env.REMINDER_CHAT_ID) : null;
+const configPath = process.env.CONFIG_PATH ?? './bot-config.json';
+
+const configStore = new ConfigStore(configPath);
+const scheduler = markcardApiUrl && reminderChatId
+  ? new SchedulerManager(markcardApiUrl, (text) =>
+      bot.api.sendMessage(reminderChatId, text).then(() => undefined),
+    )
+  : null;
+
+if (scheduler) {
+  const { reminderTimes } = configStore.load();
+  scheduler.setTimes(reminderTimes);
+}
+
+const TIME_RE = /^\d{2}:\d{2}$/;
+
+bot.command('remind', async (ctx) => {
+  if (!isAuthorized(ctx.from!.id)) return;
+
+  if (!scheduler) {
+    await ctx.reply('Reminders are not configured (MARKCARDS_API_URL or REMINDER_CHAT_ID missing).');
+    return;
+  }
+
+  const arg = ctx.match.trim();
+
+  if (!arg) {
+    const { reminderTimes } = configStore.load();
+    const reply = reminderTimes.length > 0
+      ? `Current reminders: ${reminderTimes.join(', ')}`
+      : 'No reminders set. Use /remind HH:MM or /remind HH:MM,HH:MM';
+    await ctx.reply(reply);
+    return;
+  }
+
+  if (arg === 'off') {
+    scheduler.setTimes([]);
+    configStore.save({ reminderTimes: [] });
+    await ctx.reply('All reminders cleared.');
+    return;
+  }
+
+  const times = arg.split(',').map((t) => t.trim());
+  if (!times.every((t) => TIME_RE.test(t))) {
+    await ctx.reply('Invalid format. Use HH:MM, e.g. /remind 09:00 or /remind 09:00,21:00');
+    return;
+  }
+
+  scheduler.setTimes(times);
+  configStore.save({ reminderTimes: times });
+  await ctx.reply(`Reminders set for: ${times.join(', ')}`);
 });
 
 bot.start();
