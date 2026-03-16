@@ -272,7 +272,7 @@ bot.on('message:text', async (ctx) => {
 });
 
 const markcardApiUrl = process.env.MARKCARDS_API_URL;
-const reminderChatId = process.env.REMINDER_CHAT_ID ? Number(process.env.REMINDER_CHAT_ID) : null;
+const reminderChatId = allowedUsers[0] ?? null;
 const configPath = process.env.CONFIG_PATH ?? './bot-config.json';
 
 const configStore = new ConfigStore(configPath);
@@ -293,7 +293,7 @@ bot.command('remind', async (ctx) => {
   if (!isAuthorized(ctx.from!.id)) return;
 
   if (!scheduler) {
-    await ctx.reply('Reminders are not configured (MARKCARDS_API_URL or REMINDER_CHAT_ID missing).');
+    await ctx.reply('Reminders are not configured (MARKCARDS_API_URL missing).');
     return;
   }
 
