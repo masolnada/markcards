@@ -5,7 +5,6 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import { RootLayout } from './routes/root/route';
-import { DecksPage } from './routes/decks/route';
 import { ReviewPage } from './routes/review/route';
 import { SkillsPage } from './routes/skills/route';
 import { InputPage } from './routes/input/route';
@@ -18,12 +17,6 @@ const indexRoute = createRoute({
   beforeLoad: () => {
     throw redirect({ to: '/review', search: { deck: undefined } });
   },
-});
-
-const decksRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/decks',
-  component: DecksPage,
 });
 
 const reviewRoute = createRoute({
@@ -47,7 +40,7 @@ const inputRoute = createRoute({
   component: InputPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, decksRoute, reviewRoute, skillsRoute, inputRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, reviewRoute, skillsRoute, inputRoute]);
 
 export const router = createRouter({ routeTree });
 

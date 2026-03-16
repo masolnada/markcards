@@ -7,6 +7,7 @@ import { decksQueryOptions } from '../../api/decks';
 import { deckCardsQueryOptions, deleteDeckCards } from '../../api/deck-cards';
 import { suspendedQueryOptions, unsuspendCard } from '../../api/suspended';
 import { SkillsGraph } from './SkillsGraph';
+import { DeckSummaryPanel } from './DeckSummaryPanel/DeckSummaryPanel';
 
 export function SkillsPage() {
   const [selectedDeck, setSelectedDeck] = useState<DeckSummary | null>(null);
@@ -143,6 +144,7 @@ export function SkillsPage() {
         title={deckCards?.deck.name ?? selectedDeck?.name ?? ''}
         footer={deleteFooter}
       >
+        {selectedDeck && <DeckSummaryPanel deck={selectedDeck} />}
         {cardsLoading ? (
           <div className="flex justify-center py-8">
             <Spinner size="md" />
