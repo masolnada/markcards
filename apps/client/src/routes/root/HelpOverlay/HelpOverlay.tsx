@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { SidePanel } from '@markcards/ui';
 import { useHelp } from '../HelpProvider';
 
-export type HelpRoute = 'review' | 'suspended' | 'other';
+export type HelpRoute = 'review' | 'other';
 
 interface HelpOverlayProps {
   route: HelpRoute;
@@ -55,14 +55,6 @@ export function HelpOverlay({ route }: HelpOverlayProps) {
                 <dd className="text-muted-foreground">Suspend card</dd>
               </div>
             </>
-          )}
-          {route === 'suspended' && (
-            <div className="flex items-start gap-3">
-              <dt className="flex gap-1 shrink-0">
-                <kbd className="border border-border px-1.5 py-0.5 text-xs">U</kbd>
-              </dt>
-              <dd className="text-muted-foreground">Unsuspend hovered card</dd>
-            </div>
           )}
           <div className="flex items-start gap-3">
             <dt className="flex gap-1 shrink-0">

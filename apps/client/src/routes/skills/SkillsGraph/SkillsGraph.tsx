@@ -15,7 +15,7 @@ interface GraphNode extends SimulationNodeDatum {
   label: string;
   radius: number;
   depth: number;
-  kind: 'root' | 'deck' | 'folder';
+  kind: 'root' | 'deck' | 'folder' | 'suspended';
   deckSummary?: DeckSummary;
 }
 
@@ -46,11 +46,13 @@ function stripCommonPrefix(paths: string[]): string[] {
 
 interface Props {
   decks: DeckSummary[];
+  suspendedCount: number;
   onDeckClick?: (deck: DeckSummary) => void;
   onBackgroundClick?: () => void;
+  onSuspendedClick?: () => void;
 }
 
-export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
+export function SkillsGraph({ decks, suspendedCount, onDeckClick, onBackgroundClick, onSuspendedClick }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -86,6 +88,17 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
       x: width / 2,
       y: height / 2,
     });
+
+    // Suspended node
+    const SUSPENDED_ID = '__suspended__';
+    nodeMap.set(SUSPENDED_ID, {
+      id: SUSPENDED_ID,
+      label: suspendedCount > 0 ? `suspended (${suspendedCount})` : 'suspended',
+      radius: 8,
+      depth: 1,
+      kind: 'suspended',
+    });
+    links.push({ source: SUSPENDED_ID, target: ROOT_ID });
 
     // Folder nodes
     const folderSet = new Set<string>();
@@ -193,11 +206,18 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
       } else if (n.kind === 'root') {
         circle.style.fill = 'var(--color-foreground)';
         circle.setAttribute('opacity', '0.15');
+      } else if (n.kind === 'suspended') {
+        if (suspendedCount > 0) {
+          circle.style.fill = 'var(--color-warning)';
+        } else {
+          circle.style.fill = 'var(--color-muted-foreground)';
+          circle.setAttribute('opacity', '0.4');
+        }
       } else {
         circle.style.fill = 'var(--color-muted-foreground)';
         circle.setAttribute('opacity', '0.4');
       }
-      circle.setAttribute('cursor', n.kind === 'root' ? 'default' : (onDeckClick && n.kind === 'deck' ? 'pointer' : 'grab'));
+      circle.setAttribute('cursor', n.kind === 'root' ? 'default' : (onDeckClick && n.kind === 'deck' ? 'pointer' : (onSuspendedClick && n.kind === 'suspended' ? 'pointer' : 'grab')));
       nodeGroup.appendChild(circle);
       return circle;
     });
@@ -214,6 +234,9 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
       if (n.kind === 'deck' && onDeckClick && n.deckSummary) {
         text.setAttribute('cursor', 'pointer');
         text.addEventListener('click', () => onDeckClick(n.deckSummary!));
+      } else if (n.kind === 'suspended' && onSuspendedClick) {
+        text.setAttribute('cursor', 'pointer');
+        text.addEventListener('click', () => onSuspendedClick());
       } else {
         text.setAttribute('pointer-events', 'none');
       }
@@ -256,7 +279,7 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
     let dragStartPos: { x: number; y: number } | null = null;
 
     function getPos(e: PointerEvent): { x: number; y: number } {
-      const rect = svg.getBoundingClientRect();
+      const rect = svg!.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
@@ -269,7 +292,7 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
         dragStartPos = getPos(e);
         dragging.fx = dragging.x;
         dragging.fy = dragging.y;
-        if (!(onDeckClick && node.kind === 'deck')) {
+        if (!(onDeckClick && node.kind === 'deck') && !(onSuspendedClick && node.kind === 'suspended')) {
           circle.setAttribute('cursor', 'grabbing');
         }
         circle.setPointerCapture(e.pointerId);
@@ -291,12 +314,14 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
         dragging.fy = null;
         dragging = null;
         dragStartPos = null;
-        if (!(onDeckClick && node.kind === 'deck')) {
+        if (!(onDeckClick && node.kind === 'deck') && !(onSuspendedClick && node.kind === 'suspended')) {
           circle.setAttribute('cursor', 'grab');
         }
         sim.alphaTarget(0);
         if (dist < 5 && onDeckClick && node.kind === 'deck' && node.deckSummary) {
           onDeckClick(node.deckSummary);
+        } else if (dist < 5 && onSuspendedClick && node.kind === 'suspended') {
+          onSuspendedClick();
         }
       });
     });
@@ -311,7 +336,7 @@ export function SkillsGraph({ decks, onDeckClick, onBackgroundClick }: Props) {
       sim.stop();
       svg.removeEventListener('click', handleSvgClick);
     };
-  }, [decks, onDeckClick, onBackgroundClick]);
+  }, [decks, suspendedCount, onDeckClick, onBackgroundClick, onSuspendedClick]);
 
   return (
     <svg
