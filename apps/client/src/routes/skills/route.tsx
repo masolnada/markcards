@@ -74,6 +74,11 @@ export function SkillsPage() {
     setSuspendedOpen(true);
   }, []);
 
+  const handleDeckClick = useCallback((deck: DeckSummary) => {
+    setSuspendedOpen(false);
+    setSelectedDeck(deck);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -126,7 +131,7 @@ export function SkillsPage() {
         <SkillsGraph
           decks={decks}
           suspendedCount={suspendedCount}
-          onDeckClick={setSelectedDeck}
+          onDeckClick={handleDeckClick}
           onBackgroundClick={handleBackgroundClick}
           onSuspendedClick={handleSuspendedClick}
         />
