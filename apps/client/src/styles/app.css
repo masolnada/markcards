@@ -30,6 +30,8 @@ body {
 }
 .card-content img {
   @apply block mx-auto max-w-full;
+  max-height: 400px;
+  width: auto;
 }
 .card-summary-content img { max-height: 80px; width: auto; display: inline-block; }
 
