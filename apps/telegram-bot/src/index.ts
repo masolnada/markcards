@@ -119,12 +119,29 @@ async function sendPlantCards(
   );
 }
 
+async function findCatalanWikipediaUrl(latinName: string): Promise<string | null> {
+  const url = `https://ca.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(latinName)}&format=json&redirects=1`;
+  const data = await fetch(url).then((r) => r.json()) as { query: { pages: Record<string, { missing?: string }> } };
+  const pages = data.query.pages;
+  const page = Object.values(pages)[0];
+  if (!page || 'missing' in page) return null;
+  return `https://ca.wikipedia.org/wiki/${encodeURIComponent(latinName.replace(/ /g, '_'))}`;
+}
+
+async function plantInfoUrl(latinName: string): Promise<string> {
+  const wiki = await findCatalanWikipediaUrl(latinName);
+  if (wiki) return wiki;
+  return `https://search.brave.com/images?q=${encodeURIComponent(latinName)}`;
+}
+
 async function sendPlantOptions(chatId: number, results: PlantResult[]): Promise<void> {
-  const lines = results.map((r, i) => {
+  const lines = await Promise.all(results.map(async (r, i) => {
     const pct = Math.round(r.score * 100);
-    const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(r.latinName)}`;
-    return `${i + 1}\\. *${r.latinName.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1')}* \\(${pct}%\\) · [Google Imatges](${searchUrl})`;
-  });
+    const infoUrl = await plantInfoUrl(r.latinName);
+    const isWiki = infoUrl.includes('wikipedia');
+    const linkLabel = isWiki ? 'Wikipedia' : 'Brave Imatges';
+    return `${i + 1}\\. *${r.latinName.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1')}* \\(${pct}%\\) · [${linkLabel}](${infoUrl})`;
+  }));
 
   const text = `🌿 Quina planta és?\n\n${lines.join('\n')}`;
 
