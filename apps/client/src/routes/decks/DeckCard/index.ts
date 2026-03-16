@@ -1,1 +1,0 @@
-export { DeckCard } from './DeckCard';

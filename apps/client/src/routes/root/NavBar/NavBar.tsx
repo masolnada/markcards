@@ -69,12 +69,6 @@ export function NavBar() {
             review
           </Link>
           <Link
-            to="/decks"
-            className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:underline [&.active]:underline-offset-4"
-          >
-            decks
-          </Link>
-          <Link
             to="/skills"
             className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors [&.active]:text-foreground [&.active]:underline [&.active]:underline-offset-4"
           >

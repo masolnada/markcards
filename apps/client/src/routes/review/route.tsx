@@ -97,8 +97,8 @@ export function ReviewPage() {
         title="All caught up!"
         description="No cards due for review right now."
         action={
-          <Link to="/decks">
-            <Button variant="secondary">View decks</Button>
+          <Link to="/skills">
+            <Button variant="secondary">View skills</Button>
           </Link>
         }
       />
@@ -117,8 +117,8 @@ export function ReviewPage() {
             { label: 'Failed', value: stats.failed },
           ]}
         />
-        <Link to="/decks">
-          <Button variant="secondary">Decks</Button>
+        <Link to="/skills">
+          <Button variant="secondary">Skills</Button>
         </Link>
       </div>
     );
