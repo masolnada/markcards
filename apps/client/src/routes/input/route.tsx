@@ -1,13 +1,57 @@
 import { useState } from 'react';
+import { marked, Renderer } from 'marked';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Spinner, Button, EditableCardSummary } from '@markcards/ui';
 import { EmptyState } from '../../_shared/EmptyState';
 import { inputQueryOptions, confirmCard, rejectCard } from '../../api/input';
-import type { InputCard } from '@markcards/types';
+import type { RenderedInputCard } from '../../api/input';
 
-function InputCardItem({ card, onDone }: { card: InputCard; onDone: () => void }) {
+function renderMarkdown(raw: string, imageBaseUrl?: string): string {
+  const renderer = new Renderer();
+  if (imageBaseUrl) {
+    renderer.image = ({ href, title, text }) => {
+      const src = href && !href.startsWith('http') && !href.startsWith('/')
+        ? `${imageBaseUrl}/${href}`
+        : href;
+      return `<img src="${src}" alt="${text}"${title ? ` title="${title}"` : ''}>`;
+    };
+  }
+  return marked.parse(raw, { renderer }) as string;
+}
+
+function parseAndRender(rawMarkdown: string, imageBaseUrl?: string): { promptHtml: string; revealHtml: string } {
+  const text = rawMarkdown.trim();
+
+  const clozeMatch = text.match(/^C:\s*([\s\S]+)/);
+  if (clozeMatch) {
+    const template = clozeMatch[1].trim();
+    const prompt = template.replace(/\[([^\]]+)\]/g, '_____');
+    return {
+      promptHtml: renderMarkdown(prompt, imageBaseUrl),
+      revealHtml: renderMarkdown(template, imageBaseUrl),
+    };
+  }
+
+  const qMatch = text.match(/^Q:\s*([\s\S]*?)(?=\nA:)/);
+  const aMatch = text.match(/\nA:\s*([\s\S]*?)$/);
+  if (qMatch) {
+    return {
+      promptHtml: renderMarkdown(qMatch[1].trim(), imageBaseUrl),
+      revealHtml: renderMarkdown(aMatch ? aMatch[1].trim() : '', imageBaseUrl),
+    };
+  }
+
+  return {
+    promptHtml: renderMarkdown(text, imageBaseUrl),
+    revealHtml: '',
+  };
+}
+
+function InputCardItem({ card, onDone }: { card: RenderedInputCard; onDone: () => void }) {
   const [editedMarkdown, setEditedMarkdown] = useState(card.rawMarkdown);
   const [loading, setLoading] = useState(false);
+
+  const { promptHtml, revealHtml } = parseAndRender(editedMarkdown, card.imageBaseUrl);
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -32,7 +76,12 @@ function InputCardItem({ card, onDone }: { card: InputCard; onDone: () => void }
   return (
     <div className="border border-border p-4 flex flex-col gap-3 bg-card">
       <div className="text-xs text-muted-foreground font-mono">{card.destPath}</div>
-      <EditableCardSummary rawMarkdown={editedMarkdown} onMarkdownChange={setEditedMarkdown} />
+      <EditableCardSummary
+        promptHtml={promptHtml}
+        revealHtml={revealHtml}
+        rawMarkdown={editedMarkdown}
+        onMarkdownChange={setEditedMarkdown}
+      />
       <div className="flex gap-2">
         <Button variant="primary" size="sm" onClick={handleConfirm} disabled={loading}>
           Confirm

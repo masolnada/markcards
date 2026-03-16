@@ -47,13 +47,27 @@ async function putFile(cfg: GitHubCfg, filePath: string, content: string, sha: s
   if (!res.ok) throw new Error(`GitHub PUT failed: ${res.status} ${await res.text()}`);
 }
 
+interface EnrichedInputCard extends InputCard {
+  imageBaseUrl?: string;
+}
+
 export class InputService {
   constructor(private cfg: GitHubCfg) {}
 
-  async getInputCards(): Promise<{ cards: InputCard[] }> {
+  async getInputCards(): Promise<{ cards: EnrichedInputCard[] }> {
     const file = await getFile(this.cfg, INPUT_FILE_PATH);
     if (!file) return { cards: [] };
-    return { cards: parseInputFile(file.content) };
+    const raw = parseInputFile(file.content);
+    return {
+      cards: raw.map(card => {
+        const destDir = card.destPath.includes('/')
+          ? card.destPath.slice(0, card.destPath.lastIndexOf('/'))
+          : '';
+        const fullDir = [this.cfg.basePath, destDir].filter(Boolean).join('/');
+        const imageBaseUrl = `https://raw.githubusercontent.com/${this.cfg.owner}/${this.cfg.repo}/${this.cfg.branch}${fullDir ? '/' + fullDir : ''}`;
+        return { ...card, imageBaseUrl };
+      }),
+    };
   }
 
   async confirmCard(cardId: string, markdown?: string): Promise<void> {

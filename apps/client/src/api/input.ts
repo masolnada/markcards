@@ -1,12 +1,16 @@
 import { queryOptions } from '@tanstack/react-query';
 import type { InputCard } from '@markcards/types';
 
+export interface RenderedInputCard extends InputCard {
+  imageBaseUrl?: string;
+}
+
 export const inputQueryOptions = queryOptions({
   queryKey: ['input'],
-  queryFn: async (): Promise<{ cards: InputCard[] }> => {
+  queryFn: async (): Promise<{ cards: RenderedInputCard[] }> => {
     const res = await fetch('/api/input');
     if (!res.ok) throw new Error('Failed to fetch input cards');
-    return res.json() as Promise<{ cards: InputCard[] }>;
+    return res.json() as Promise<{ cards: RenderedInputCard[] }>;
   },
   staleTime: Infinity,
   refetchOnMount: 'always',
