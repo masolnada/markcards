@@ -60,11 +60,11 @@ export class InputService {
     const raw = parseInputFile(file.content);
     return {
       cards: raw.map(card => {
+        // destPath already includes basePath (stored that way by appendToInputFile)
         const destDir = card.destPath.includes('/')
           ? card.destPath.slice(0, card.destPath.lastIndexOf('/'))
           : '';
-        const fullDir = [this.cfg.basePath, destDir].filter(Boolean).join('/');
-        const imageBaseUrl = `https://raw.githubusercontent.com/${this.cfg.owner}/${this.cfg.repo}/${this.cfg.branch}${fullDir ? '/' + fullDir : ''}`;
+        const imageBaseUrl = `https://raw.githubusercontent.com/${this.cfg.owner}/${this.cfg.repo}/${this.cfg.branch}${destDir ? '/' + destDir : ''}`;
         return { ...card, imageBaseUrl };
       }),
     };
@@ -79,9 +79,8 @@ export class InputService {
     if (!card) throw Object.assign(new Error('Card not found'), { status: 404 });
 
     const finalMarkdown = markdown ?? card.rawMarkdown;
-    const destFilePath = this.cfg.basePath
-      ? `${this.cfg.basePath}/${card.destPath}`
-      : card.destPath;
+    // destPath already includes basePath (stored that way by appendToInputFile)
+    const destFilePath = card.destPath;
 
     // Remove from input.md
     const updatedInput = removeInputCard(file.content, cardId);
