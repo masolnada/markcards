@@ -11,7 +11,7 @@ export function DeckSummaryPanel({ deck }: DeckSummaryPanelProps) {
   const hasDue = deck.stats.due > 0;
 
   return (
-    <div className="flex flex-col gap-4 py-2">
+    <div className="flex flex-col gap-4 pb-4 mb-4 border-b border-border">
       <div className="flex flex-wrap gap-2">
         <span className="text-sm text-muted-foreground">{deck.stats.total} cards</span>
         {deck.stats.newCards > 0 && (
