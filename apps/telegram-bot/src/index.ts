@@ -25,6 +25,7 @@ if (!token) throw new Error('TELEGRAM_BOT_TOKEN is required');
 if (!process.env.GOOGLE_GEMINI_API_KEY) throw new Error('GOOGLE_GEMINI_API_KEY is required');
 if (!process.env.GITHUB_REPO) throw new Error('GITHUB_REPO is required');
 if (!process.env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN is required');
+if (!process.env.MARKCARDS_API_URL) throw new Error('MARKCARDS_API_URL is required');
 
 const [githubOwner, githubRepo] = process.env.GITHUB_REPO.split('/');
 if (!githubOwner || !githubRepo) throw new Error('GITHUB_REPO must be "owner/repo"');
@@ -271,12 +272,12 @@ bot.on('message:text', async (ctx) => {
   }
 });
 
-const markcardApiUrl = process.env.MARKCARDS_API_URL;
+const markcardApiUrl = process.env.MARKCARDS_API_URL!;
 const reminderChatId = allowedUsers[0] ?? null;
 const configPath = process.env.CONFIG_PATH ?? './bot-config.json';
 
 const configStore = new ConfigStore(configPath);
-const scheduler = markcardApiUrl && reminderChatId
+const scheduler = reminderChatId
   ? new SchedulerManager(markcardApiUrl, (text) =>
       bot.api.sendMessage(reminderChatId, text).then(() => undefined),
     )
@@ -293,7 +294,7 @@ bot.command('remind', async (ctx) => {
   if (!isAuthorized(ctx.from!.id)) return;
 
   if (!scheduler) {
-    await ctx.reply('Reminders are not configured (MARKCARDS_API_URL missing).');
+    await ctx.reply('Reminders are not configured (ALLOWED_USER_IDS is not set).');
     return;
   }
 
