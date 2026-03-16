@@ -3,6 +3,21 @@ import { classify, generateCards, analyzeImage, type Source, type ImageAnalysis 
 import { getFileContent, appendToInputFile, uploadFile } from './github.js';
 import { identifyPlant, type PlantResult } from './plantnet.js';
 
+function isLlmOverloaded(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'statusCode' in err &&
+    (err as { statusCode: number }).statusCode === 503
+  );
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  return isLlmOverloaded(err)
+    ? 'The AI model is overloaded right now. Please try again later.'
+    : fallback;
+}
+
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) throw new Error('TELEGRAM_BOT_TOKEN is required');
 if (!process.env.GOOGLE_GEMINI_API_KEY) throw new Error('GOOGLE_GEMINI_API_KEY is required');
@@ -191,7 +206,7 @@ bot.on('message:photo', async (ctx) => {
     }
   } catch (err) {
     console.error(err);
-    await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
+    await ctx.api.editMessageText(chatId, placeholder.message_id, errorMessage(err, 'Something went wrong generating cards.'));
   }
 });
 
@@ -215,7 +230,7 @@ bot.on('callback_query:data', async (ctx) => {
     await savePlantAndCreateCards(ctx.chat!.id, pending.imageBuffer, selected, placeholder);
   } catch (err) {
     console.error(err);
-    await bot.api.editMessageText(ctx.chat!.id, placeholder.message_id, 'Something went wrong.');
+    await bot.api.editMessageText(ctx.chat!.id, placeholder.message_id, errorMessage(err, 'Something went wrong.'));
   } finally {
     pendingPlants.delete(userId);
   }
@@ -237,7 +252,7 @@ bot.command('more', async (ctx) => {
     await sendGeneratedCards(chatId, { type: 'image', imageBuffer: last.imageBuffer, caption: last.caption }, placeholder);
   } catch (err) {
     console.error(err);
-    await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
+    await ctx.api.editMessageText(chatId, placeholder.message_id, errorMessage(err, 'Something went wrong generating cards.'));
   }
 });
 
@@ -250,7 +265,7 @@ bot.on('message:text', async (ctx) => {
     await sendGeneratedCards(chatId, { type: 'text', prompt: ctx.message.text }, placeholder);
   } catch (err) {
     console.error(err);
-    await ctx.api.editMessageText(chatId, placeholder.message_id, 'Something went wrong generating cards.');
+    await ctx.api.editMessageText(chatId, placeholder.message_id, errorMessage(err, 'Something went wrong generating cards.'));
   }
 });
 
