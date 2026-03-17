@@ -25,17 +25,6 @@ const isAuthorized = (userId: number) =>
 
 const bot = new Bot(token);
 
-registerCardHandlers(bot, {
-  token,
-  githubOwner,
-  githubRepo,
-  githubBranch: process.env.GITHUB_BRANCH ?? 'main',
-  githubToken: process.env.GITHUB_TOKEN!,
-  githubBasePath: process.env.GITHUB_PATH ?? 'cards',
-  plantnetApiKey: process.env.PLANTNET_API_KEY ?? null,
-  isAuthorized,
-});
-
 const reminderChatId = allowedUsers[0] ?? null;
 const configStore = new ConfigStore(process.env.CONFIG_PATH ?? './bot-config.json');
 const scheduler = reminderChatId
@@ -48,7 +37,19 @@ if (scheduler) {
   scheduler.setTimes(configStore.load().reminderTimes);
 }
 
+// Commands must be registered before the generic message:text handler in cards
 registerRemindCommand(bot, { scheduler, configStore, isAuthorized });
+
+registerCardHandlers(bot, {
+  token,
+  githubOwner,
+  githubRepo,
+  githubBranch: process.env.GITHUB_BRANCH ?? 'main',
+  githubToken: process.env.GITHUB_TOKEN!,
+  githubBasePath: process.env.GITHUB_PATH ?? 'cards',
+  plantnetApiKey: process.env.PLANTNET_API_KEY ?? null,
+  isAuthorized,
+});
 
 bot.start();
 console.log('Bot started');
